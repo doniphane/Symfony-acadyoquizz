@@ -3,50 +3,89 @@
 namespace App\Entity;
 
 use ApiPlatform\Metadata\ApiResource;
+use ApiPlatform\Metadata\Get;
+use ApiPlatform\Metadata\GetCollection;
+use ApiPlatform\Metadata\Put;
+use ApiPlatform\Metadata\Delete;
+use ApiPlatform\Metadata\Post;
+use ApiPlatform\Metadata\Patch;
+use App\State\UserPasswordHasher;
 use App\Repository\UserRepository;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
+use Symfony\Component\Security\Core\User\PasswordAuthenticatedUserInterface;
+use Symfony\Component\Security\Core\User\UserInterface;
+use Symfony\Component\Validator\Constraints as Assert;
+use Symfony\Bridge\Doctrine\Validator\Constraints\UniqueEntity;
+use Symfony\Component\Serializer\Annotation\Groups;
 
 #[ORM\Entity(repositoryClass: UserRepository::class)]
-#[ApiResource]
-class User
+#[ORM\Table(name: '`user`')]
+#[UniqueEntity(fields: ['email'], message: 'Cet email est déjà utilisé')]
+#[ApiResource(
+    operations: [
+        new GetCollection(),
+        new Post(processor: UserPasswordHasher::class, validationContext: ['groups' => ['Default', 'user:create']]),
+        new Get(),
+        new Put(processor: UserPasswordHasher::class),
+        new Patch(processor: UserPasswordHasher::class),
+        new Delete(),
+    ],
+    normalizationContext: ['groups' => ['user:read']],
+    denormalizationContext: ['groups' => ['user:create', 'user:update']]
+)]
+class User implements UserInterface, PasswordAuthenticatedUserInterface
 {
+    #[Groups(['user:read'])]
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column]
     private ?int $id = null;
 
-    #[ORM\Column(length: 255)]
+    #[Assert\NotBlank(message: 'L\'email ne peut pas être vide')]
+    #[Assert\Email(message: 'Veuillez saisir un email valide')]
+    #[Groups(['user:read', 'user:create', 'user:update'])]
+    #[ORM\Column(length: 180, unique: true)]
     private ?string $email = null;
 
-    #[ORM\Column(length: 255)]
+
+    #[ORM\Column]
     private ?string $password = null;
 
+
+    #[Assert\NotBlank(message: 'Le mot de passe ne peut pas être vide', groups: ['user:create'])]
+    #[Groups(['user:create', 'user:update'])]
+    private ?string $plainPassword = null;
+
+    #[Assert\NotBlank(message: 'Le prénom ne peut pas être vide')]
+    #[Assert\Length(min: 2, max: 255, minMessage: 'Le prénom doit faire au moins 2 caractères')]
+    #[Groups(['user:read', 'user:create', 'user:update'])]
     #[ORM\Column(length: 255)]
     private ?string $firtName = null;
 
+    #[Assert\NotBlank(message: 'Le nom ne peut pas être vide')]
+    #[Assert\Length(min: 2, max: 255, minMessage: 'Le nom doit faire au moins 2 caractères')]
+    #[Groups(['user:read', 'user:create', 'user:update'])]
     #[ORM\Column(length: 255)]
     private ?string $lastName = null;
 
-    #[ORM\Column]
+    #[Groups(['user:read', 'user:create', 'user:update'])]
+    #[ORM\Column(type: 'json')]
     private array $roles = [];
 
+    #[Groups(['user:read'])]
     #[ORM\Column]
     private ?\DateTimeImmutable $createdAt = null;
 
+    #[Groups(['user:read'])]
     #[ORM\Column(nullable: true)]
     private ?\DateTimeImmutable $updatedAt = null;
 
-    /**
-     * @var Collection<int, Quiz>
-     */
+
     #[ORM\OneToMany(targetEntity: Quiz::class, mappedBy: 'teacher')]
     private Collection $quizzes;
 
-    /**
-     * @var Collection<int, QuizAttempt>
-     */
     #[ORM\OneToMany(targetEntity: QuizAttempt::class, mappedBy: 'student', orphanRemoval: true)]
     private Collection $quizAttempts;
 
@@ -85,6 +124,18 @@ class User
         return $this;
     }
 
+    public function getPlainPassword(): ?string
+    {
+        return $this->plainPassword;
+    }
+
+    public function setPlainPassword(?string $plainPassword): static
+    {
+        $this->plainPassword = $plainPassword;
+
+        return $this;
+    }
+
     public function getFirtName(): ?string
     {
         return $this->firtName;
@@ -111,7 +162,11 @@ class User
 
     public function getRoles(): array
     {
-        return $this->roles;
+        $roles = $this->roles;
+        // Garantir que chaque utilisateur a au moins ROLE_USER
+        $roles[] = 'ROLE_USER';
+
+        return array_unique($roles);
     }
 
     public function setRoles(array $roles): static
@@ -175,9 +230,7 @@ class User
         return $this;
     }
 
-    /**
-     * @return Collection<int, QuizAttempt>
-     */
+
     public function getQuizAttempts(): Collection
     {
         return $this->quizAttempts;
@@ -203,5 +256,17 @@ class User
         }
 
         return $this;
+    }
+
+
+    public function getUserIdentifier(): string
+    {
+        return (string) $this->email;
+    }
+
+    public function eraseCredentials(): void
+    {
+
+        $this->plainPassword = null;
     }
 }
