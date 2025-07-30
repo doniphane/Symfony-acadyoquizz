@@ -50,24 +50,20 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     private ?string $email = null;
 
 
+    #[Assert\NotBlank(message: 'Le mot de passe ne peut pas être vide', groups: ['user:create'])]
+    #[Assert\Length(min: 6, minMessage: 'Le mot de passe doit faire au moins 6 caractères')]
+    #[Groups(['user:create', 'user:update'])]
     #[ORM\Column]
     private ?string $password = null;
 
-
-    #[Assert\NotBlank(message: 'Le mot de passe ne peut pas être vide', groups: ['user:create'])]
-    #[Groups(['user:create', 'user:update'])]
-    private ?string $plainPassword = null;
-
-    #[Assert\NotBlank(message: 'Le prénom ne peut pas être vide')]
     #[Assert\Length(min: 2, max: 255, minMessage: 'Le prénom doit faire au moins 2 caractères')]
     #[Groups(['user:read', 'user:create', 'user:update'])]
-    #[ORM\Column(length: 255)]
+    #[ORM\Column(length: 255, nullable: true)]
     private ?string $firtName = null;
 
-    #[Assert\NotBlank(message: 'Le nom ne peut pas être vide')]
     #[Assert\Length(min: 2, max: 255, minMessage: 'Le nom doit faire au moins 2 caractères')]
     #[Groups(['user:read', 'user:create', 'user:update'])]
-    #[ORM\Column(length: 255)]
+    #[ORM\Column(length: 255, nullable: true)]
     private ?string $lastName = null;
 
     #[Groups(['user:read', 'user:create', 'user:update'])]
@@ -82,10 +78,15 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     #[ORM\Column(nullable: true)]
     private ?\DateTimeImmutable $updatedAt = null;
 
-
+    /**
+     * @var Collection<int, Quiz>
+     */
     #[ORM\OneToMany(targetEntity: Quiz::class, mappedBy: 'teacher')]
     private Collection $quizzes;
 
+    /**
+     * @var Collection<int, QuizAttempt>
+     */
     #[ORM\OneToMany(targetEntity: QuizAttempt::class, mappedBy: 'student', orphanRemoval: true)]
     private Collection $quizAttempts;
 
@@ -124,24 +125,12 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
         return $this;
     }
 
-    public function getPlainPassword(): ?string
-    {
-        return $this->plainPassword;
-    }
-
-    public function setPlainPassword(?string $plainPassword): static
-    {
-        $this->plainPassword = $plainPassword;
-
-        return $this;
-    }
-
     public function getFirtName(): ?string
     {
         return $this->firtName;
     }
 
-    public function setFirtName(string $firtName): static
+    public function setFirtName(?string $firtName): static
     {
         $this->firtName = $firtName;
 
@@ -153,7 +142,7 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
         return $this->lastName;
     }
 
-    public function setLastName(string $lastName): static
+    public function setLastName(?string $lastName): static
     {
         $this->lastName = $lastName;
 
@@ -221,7 +210,7 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     public function removeQuiz(Quiz $quiz): static
     {
         if ($this->quizzes->removeElement($quiz)) {
-            // set the owning side to null (unless already changed)
+
             if ($quiz->getTeacher() === $this) {
                 $quiz->setTeacher(null);
             }
@@ -230,7 +219,9 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
         return $this;
     }
 
-
+    /**
+     * @return Collection<int, QuizAttempt>
+     */
     public function getQuizAttempts(): Collection
     {
         return $this->quizAttempts;
@@ -249,7 +240,7 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     public function removeQuizAttempt(QuizAttempt $quizAttempt): static
     {
         if ($this->quizAttempts->removeElement($quizAttempt)) {
-            // set the owning side to null (unless already changed)
+
             if ($quizAttempt->getStudent() === $this) {
                 $quizAttempt->setStudent(null);
             }
@@ -267,6 +258,6 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     public function eraseCredentials(): void
     {
 
-        $this->plainPassword = null;
+
     }
 }

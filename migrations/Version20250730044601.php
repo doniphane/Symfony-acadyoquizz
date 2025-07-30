@@ -10,7 +10,7 @@ use Doctrine\Migrations\AbstractMigration;
 /**
  * Auto-generated Migration: Please modify to your needs!
  */
-final class Version20250729055427 extends AbstractMigration
+final class Version20250730044601 extends AbstractMigration
 {
     public function getDescription(): string
     {
@@ -25,11 +25,11 @@ final class Version20250729055427 extends AbstractMigration
         $this->addSql('CREATE TABLE quiz (id INT AUTO_INCREMENT NOT NULL, teacher_id INT NOT NULL, title VARCHAR(255) NOT NULL, description LONGTEXT DEFAULT NULL, unique_code VARCHAR(10) NOT NULL, is_active TINYINT(1) NOT NULL, is_started TINYINT(1) NOT NULL, passing_score INT NOT NULL, created_at DATETIME NOT NULL COMMENT \'(DC2Type:datetime_immutable)\', updated_at DATETIME DEFAULT NULL COMMENT \'(DC2Type:datetime_immutable)\', INDEX IDX_A412FA9241807E1D (teacher_id), PRIMARY KEY(id)) DEFAULT CHARACTER SET utf8mb4 COLLATE `utf8mb4_unicode_ci` ENGINE = InnoDB');
         $this->addSql('CREATE TABLE quiz_attempt (id INT AUTO_INCREMENT NOT NULL, student_id INT NOT NULL, quiz_id INT DEFAULT NULL, score NUMERIC(5, 2) DEFAULT NULL, total_questions INT NOT NULL, correct_answers INT NOT NULL, is_passed TINYINT(1) DEFAULT NULL, is_completed TINYINT(1) NOT NULL, started_at DATETIME NOT NULL COMMENT \'(DC2Type:datetime_immutable)\', completed_at DATETIME DEFAULT NULL COMMENT \'(DC2Type:datetime_immutable)\', INDEX IDX_AB6AFC6CB944F1A (student_id), INDEX IDX_AB6AFC6853CD175 (quiz_id), PRIMARY KEY(id)) DEFAULT CHARACTER SET utf8mb4 COLLATE `utf8mb4_unicode_ci` ENGINE = InnoDB');
         $this->addSql('CREATE TABLE student_answer (id INT AUTO_INCREMENT NOT NULL, question_id INT NOT NULL, answer_id INT NOT NULL, quiz_attempt_id INT NOT NULL, is_correct TINYINT(1) NOT NULL, answered_at DATETIME NOT NULL COMMENT \'(DC2Type:datetime_immutable)\', INDEX IDX_54EB92A51E27F6BF (question_id), INDEX IDX_54EB92A5AA334807 (answer_id), INDEX IDX_54EB92A5F8FE9957 (quiz_attempt_id), PRIMARY KEY(id)) DEFAULT CHARACTER SET utf8mb4 COLLATE `utf8mb4_unicode_ci` ENGINE = InnoDB');
-        $this->addSql('CREATE TABLE user (id INT AUTO_INCREMENT NOT NULL, email VARCHAR(255) NOT NULL, password VARCHAR(255) NOT NULL, firt_name VARCHAR(255) NOT NULL, last_name VARCHAR(255) NOT NULL, roles JSON NOT NULL, created_at DATETIME NOT NULL COMMENT \'(DC2Type:datetime_immutable)\', updated_at DATETIME DEFAULT NULL COMMENT \'(DC2Type:datetime_immutable)\', PRIMARY KEY(id)) DEFAULT CHARACTER SET utf8mb4 COLLATE `utf8mb4_unicode_ci` ENGINE = InnoDB');
+        $this->addSql('CREATE TABLE `user` (id INT AUTO_INCREMENT NOT NULL, email VARCHAR(180) NOT NULL, password VARCHAR(255) NOT NULL, firt_name VARCHAR(255) DEFAULT NULL, last_name VARCHAR(255) DEFAULT NULL, roles JSON NOT NULL, created_at DATETIME NOT NULL COMMENT \'(DC2Type:datetime_immutable)\', updated_at DATETIME DEFAULT NULL COMMENT \'(DC2Type:datetime_immutable)\', UNIQUE INDEX UNIQ_8D93D649E7927C74 (email), PRIMARY KEY(id)) DEFAULT CHARACTER SET utf8mb4 COLLATE `utf8mb4_unicode_ci` ENGINE = InnoDB');
         $this->addSql('ALTER TABLE answer ADD CONSTRAINT FK_DADD4A251E27F6BF FOREIGN KEY (question_id) REFERENCES question (id)');
         $this->addSql('ALTER TABLE question ADD CONSTRAINT FK_B6F7494E853CD175 FOREIGN KEY (quiz_id) REFERENCES quiz (id)');
-        $this->addSql('ALTER TABLE quiz ADD CONSTRAINT FK_A412FA9241807E1D FOREIGN KEY (teacher_id) REFERENCES user (id)');
-        $this->addSql('ALTER TABLE quiz_attempt ADD CONSTRAINT FK_AB6AFC6CB944F1A FOREIGN KEY (student_id) REFERENCES user (id)');
+        $this->addSql('ALTER TABLE quiz ADD CONSTRAINT FK_A412FA9241807E1D FOREIGN KEY (teacher_id) REFERENCES `user` (id)');
+        $this->addSql('ALTER TABLE quiz_attempt ADD CONSTRAINT FK_AB6AFC6CB944F1A FOREIGN KEY (student_id) REFERENCES `user` (id)');
         $this->addSql('ALTER TABLE quiz_attempt ADD CONSTRAINT FK_AB6AFC6853CD175 FOREIGN KEY (quiz_id) REFERENCES quiz (id)');
         $this->addSql('ALTER TABLE student_answer ADD CONSTRAINT FK_54EB92A51E27F6BF FOREIGN KEY (question_id) REFERENCES question (id)');
         $this->addSql('ALTER TABLE student_answer ADD CONSTRAINT FK_54EB92A5AA334807 FOREIGN KEY (answer_id) REFERENCES answer (id)');
@@ -52,6 +52,6 @@ final class Version20250729055427 extends AbstractMigration
         $this->addSql('DROP TABLE quiz');
         $this->addSql('DROP TABLE quiz_attempt');
         $this->addSql('DROP TABLE student_answer');
-        $this->addSql('DROP TABLE user');
+        $this->addSql('DROP TABLE `user`');
     }
 }
