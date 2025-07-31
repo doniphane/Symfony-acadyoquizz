@@ -88,6 +88,15 @@ class Quiz
         $this->accessCode = $this->generateAccessCode();
     }
 
+    /**
+     * Génère un nouveau code d'accès pour ce quiz
+     * Utilisé si le code actuel entre en conflit
+     */
+    public function regenerateAccessCode(): void
+    {
+        $this->accessCode = $this->generateAccessCode();
+    }
+
 
 
     public function getId(): ?int
@@ -262,7 +271,12 @@ class Quiz
 
     private function generateAccessCode(): string
     {
-        // Génère un code d'accès de 6 caractères aléatoires
-        return strtoupper(substr(str_shuffle('ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'), 0, 6));
+
+        $characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+        $code = '';
+        for ($i = 0; $i < 6; $i++) {
+            $code .= $characters[random_int(0, strlen($characters) - 1)];
+        }
+        return $code;
     }
 }

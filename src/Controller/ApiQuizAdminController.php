@@ -95,13 +95,30 @@ class ApiQuizAdminController extends AbstractController
                 }
             }
 
-            $entityManager->flush();
+            // Gérer les de codes d'accès au quizz qui sont en double  lors du flush en base de données
+            // En cas de conflit, on régénère le code d'accès jusqu'à 10
+            // fois avant de renoncer
+            $maxAttempts = 10;
+            $attempts = 0;
+            while ($attempts < $maxAttempts) {
+                try {
+                    $entityManager->flush();
+                    break; // Si ça marche, on sort de la boucle
+                } catch (\Doctrine\DBAL\Exception\UniqueConstraintViolationException $e) {
+                    $attempts++;
+                    if ($attempts >= $maxAttempts) {
+                        throw new \Exception('Impossible de générer un code d\'accès unique après ' . $maxAttempts . ' tentatives');
+                    }
+                    // Régénérer le code d'accès et réessayer
+                    $quiz->regenerateAccessCode();
+                }
+            }
 
             return new JsonResponse([
                 'id' => $quiz->getId(),
                 'title' => $quiz->getTitle(),
                 'description' => $quiz->getDescription(),
-                'uniqueCode' => $quiz->getAccessCode(), // Retourner comme uniqueCode pour le frontend
+                'uniqueCode' => $quiz->getAccessCode(),
                 'accessCode' => $quiz->getAccessCode(),
                 'isActive' => $quiz->isActive(),
                 'isStarted' => $quiz->isStarted(),
