@@ -14,8 +14,10 @@ use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
 use Symfony\Component\Serializer\Annotation\Groups;
+use Symfony\Component\Serializer\Annotation\SerializedName;
 use App\State\QuizDataPersister;
 use App\State\QuizDataProvider;
+use App\State\QuizUpdateProcessor;
 
 #[ORM\Entity(repositoryClass: QuizRepository::class)]
 #[ApiResource(
@@ -23,7 +25,10 @@ use App\State\QuizDataProvider;
         new Get(),
         new GetCollection(),
         new Post(processor: QuizDataPersister::class),
-        new Put(),
+        new Put(
+            processor: QuizUpdateProcessor::class,
+            denormalizationContext: ['groups' => ['quiz:update']]
+        ),
         new Delete()
     ],
     normalizationContext: ['groups' => ['quiz:read']],
@@ -39,11 +44,11 @@ class Quiz
     private ?int $id = null;
 
     #[ORM\Column(length: 255)]
-    #[Groups(['quiz:read', 'quiz:write'])]
+    #[Groups(['quiz:read', 'quiz:write', 'quiz:update'])]
     private ?string $title = null;
 
     #[ORM\Column(type: 'text', nullable: true)]
-    #[Groups(['quiz:read', 'quiz:write'])]
+    #[Groups(['quiz:read', 'quiz:write', 'quiz:update'])]
     private ?string $description = null;
 
     #[ORM\Column(length: 10, unique: true)]
@@ -51,15 +56,15 @@ class Quiz
     private ?string $accessCode = null;
 
     #[ORM\Column]
-    #[Groups(['quiz:read', 'quiz:write'])]
+    #[Groups(['quiz:read', 'quiz:write', 'quiz:update'])]
     private ?bool $isActive = true;
 
     #[ORM\Column]
-    #[Groups(['quiz:read', 'quiz:write'])]
+    #[Groups(['quiz:read', 'quiz:write', 'quiz:update'])]
     private ?bool $isStarted = false;
 
     #[ORM\Column]
-    #[Groups(['quiz:read', 'quiz:write'])]
+    #[Groups(['quiz:read', 'quiz:write', 'quiz:update'])]
     private ?int $passingScore = 70;
 
     #[ORM\Column]
@@ -78,6 +83,7 @@ class Quiz
 
     #[ORM\OneToMany(mappedBy: 'quiz', targetEntity: QuizAttempt::class, orphanRemoval: true)]
     #[Groups(['quiz:read'])]
+    #[ApiProperty(readableLink: true, writableLink: false)]
     private Collection $quizAttempts;
 
     public function __construct()
@@ -149,6 +155,8 @@ class Quiz
         return $this->accessCode;
     }
 
+    #[Groups(['quiz:read'])]
+    #[SerializedName('isActive')]
     public function isActive(): ?bool
     {
         return $this->isActive;
@@ -161,6 +169,8 @@ class Quiz
         return $this;
     }
 
+    #[Groups(['quiz:read'])]
+    #[SerializedName('isStarted')]
     public function isStarted(): ?bool
     {
         return $this->isStarted;
@@ -271,7 +281,8 @@ class Quiz
 
     private function generateAccessCode(): string
     {
-
+        // Génère un code d'accès de 6 caractères aléatoires
+        // Note: L'unicité est garantie par la contrainte unique en base de données
         $characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
         $code = '';
         for ($i = 0; $i < 6; $i++) {
