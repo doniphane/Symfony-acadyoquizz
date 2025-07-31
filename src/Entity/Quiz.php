@@ -3,66 +3,92 @@
 namespace App\Entity;
 
 use ApiPlatform\Metadata\ApiResource;
+use ApiPlatform\Metadata\Get;
+use ApiPlatform\Metadata\GetCollection;
+use ApiPlatform\Metadata\Post;
+use ApiPlatform\Metadata\Put;
+use ApiPlatform\Metadata\Delete;
+use ApiPlatform\Metadata\ApiProperty;
 use App\Repository\QuizRepository;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
-use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
+use Symfony\Component\Serializer\Annotation\Groups;
+use App\State\QuizDataPersister;
+use App\State\QuizDataProvider;
 
 #[ORM\Entity(repositoryClass: QuizRepository::class)]
-#[ApiResource]
+#[ApiResource(
+    operations: [
+        new Get(),
+        new GetCollection(),
+        new Post(processor: QuizDataPersister::class),
+        new Put(),
+        new Delete()
+    ],
+    normalizationContext: ['groups' => ['quiz:read']],
+    denormalizationContext: ['groups' => ['quiz:write']],
+    formats: ['jsonld', 'json']
+)]
 class Quiz
 {
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column]
+    #[Groups(['quiz:read'])]
     private ?int $id = null;
 
     #[ORM\Column(length: 255)]
+    #[Groups(['quiz:read', 'quiz:write'])]
     private ?string $title = null;
 
-    #[ORM\Column(type: Types::TEXT, nullable: true)]
+    #[ORM\Column(type: 'text', nullable: true)]
+    #[Groups(['quiz:read', 'quiz:write'])]
     private ?string $description = null;
 
-    #[ORM\Column(length: 10)]
-    private ?string $uniqueCode = null;
+    #[ORM\Column(length: 10, unique: true)]
+    #[Groups(['quiz:read'])]
+    private ?string $accessCode = null;
 
     #[ORM\Column]
-    private ?bool $isActive = null;
+    #[Groups(['quiz:read', 'quiz:write'])]
+    private ?bool $isActive = true;
 
     #[ORM\Column]
-    private ?bool $isStarted = null;
+    #[Groups(['quiz:read', 'quiz:write'])]
+    private ?bool $isStarted = false;
 
     #[ORM\Column]
-    private ?int $passingScore = null;
+    #[Groups(['quiz:read', 'quiz:write'])]
+    private ?int $passingScore = 70;
 
     #[ORM\Column]
+    #[Groups(['quiz:read', 'quiz:write'])]
     private ?\DateTimeImmutable $createdAt = null;
-
-    #[ORM\Column(nullable: true)]
-    private ?\DateTimeImmutable $updatedAt = null;
 
     #[ORM\ManyToOne(inversedBy: 'quizzes')]
     #[ORM\JoinColumn(nullable: false)]
-    private ?User $teacher = null;
+    #[Groups(['quiz:read'])]
+    private ?User $createdBy = null;
 
-    /**
-     * @var Collection<int, Question>
-     */
-    #[ORM\OneToMany(targetEntity: Question::class, mappedBy: 'quiz', orphanRemoval: true)]
+    #[ORM\OneToMany(mappedBy: 'quiz', targetEntity: Question::class, orphanRemoval: true)]
+    #[Groups(['quiz:read'])]
+    #[ApiProperty(readableLink: true, writableLink: false)]
     private Collection $questions;
 
-    /**
-     * @var Collection<int, QuizAttempt>
-     */
-    #[ORM\OneToMany(targetEntity: QuizAttempt::class, mappedBy: 'quiz')]
+    #[ORM\OneToMany(mappedBy: 'quiz', targetEntity: QuizAttempt::class, orphanRemoval: true)]
+    #[Groups(['quiz:read'])]
     private Collection $quizAttempts;
 
     public function __construct()
     {
         $this->questions = new ArrayCollection();
         $this->quizAttempts = new ArrayCollection();
+        $this->createdAt = new \DateTimeImmutable();
+        $this->accessCode = $this->generateAccessCode();
     }
+
+
 
     public function getId(): ?int
     {
@@ -93,16 +119,25 @@ class Quiz
         return $this;
     }
 
-    public function getUniqueCode(): ?string
+    public function getAccessCode(): ?string
     {
-        return $this->uniqueCode;
+        return $this->accessCode;
     }
 
-    public function setUniqueCode(string $uniqueCode): static
+    public function setAccessCode(string $accessCode): static
     {
-        $this->uniqueCode = $uniqueCode;
+        $this->accessCode = $accessCode;
 
         return $this;
+    }
+
+    /**
+     * Getter pour uniqueCode (alias de accessCode pour compatibilité frontend)
+     */
+    #[Groups(['quiz:read'])]
+    public function getUniqueCode(): ?string
+    {
+        return $this->accessCode;
     }
 
     public function isActive(): ?bool
@@ -153,26 +188,14 @@ class Quiz
         return $this;
     }
 
-    public function getUpdatedAt(): ?\DateTimeImmutable
+    public function getCreatedBy(): ?User
     {
-        return $this->updatedAt;
+        return $this->createdBy;
     }
 
-    public function setUpdatedAt(?\DateTimeImmutable $updatedAt): static
+    public function setCreatedBy(?User $createdBy): static
     {
-        $this->updatedAt = $updatedAt;
-
-        return $this;
-    }
-
-    public function getTeacher(): ?User
-    {
-        return $this->teacher;
-    }
-
-    public function setTeacher(?User $teacher): static
-    {
-        $this->teacher = $teacher;
+        $this->createdBy = $createdBy;
 
         return $this;
     }
@@ -235,5 +258,11 @@ class Quiz
         }
 
         return $this;
+    }
+
+    private function generateAccessCode(): string
+    {
+        // Génère un code d'accès de 6 caractères aléatoires
+        return strtoupper(substr(str_shuffle('ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'), 0, 6));
     }
 }

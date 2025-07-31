@@ -3,46 +3,60 @@
 namespace App\Entity;
 
 use ApiPlatform\Metadata\ApiResource;
+use ApiPlatform\Metadata\Get;
+use ApiPlatform\Metadata\GetCollection;
+use ApiPlatform\Metadata\Post;
+use ApiPlatform\Metadata\Put;
+use ApiPlatform\Metadata\Delete;
 use App\Repository\AnswerRepository;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
-use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
+use Symfony\Component\Serializer\Annotation\Groups;
 
 #[ORM\Entity(repositoryClass: AnswerRepository::class)]
-#[ApiResource]
+#[ApiResource(
+    operations: [
+        new Get(),
+        new GetCollection(),
+        new Post(),
+        new Put(),
+        new Delete()
+    ],
+    normalizationContext: ['groups' => ['answer:read']],
+    denormalizationContext: ['groups' => ['answer:write']]
+)]
 class Answer
 {
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column]
+    #[Groups(['answer:read'])]
     private ?int $id = null;
 
-    #[ORM\Column(type: Types::TEXT)]
-    private ?string $content = null;
+    #[ORM\Column(type: 'text')]
+    #[Groups(['answer:read', 'answer:write'])]
+    private ?string $text = null;
 
     #[ORM\Column]
-    private ?bool $isCorrect = null;
+    #[Groups(['answer:read', 'answer:write'])]
+    private ?bool $isCorrect = false;
 
     #[ORM\Column]
-    private ?int $position = null;
-
-    #[ORM\Column]
-    private ?\DateTimeImmutable $createdAt = null;
+    #[Groups(['answer:read', 'answer:write'])]
+    private ?int $orderNumber = null;
 
     #[ORM\ManyToOne(inversedBy: 'answers')]
     #[ORM\JoinColumn(nullable: false)]
+    #[Groups(['answer:read', 'answer:write'])]
     private ?Question $question = null;
 
-    /**
-     * @var Collection<int, StudentAnswer>
-     */
-    #[ORM\OneToMany(targetEntity: StudentAnswer::class, mappedBy: 'answer')]
-    private Collection $studentAnswers;
+    #[ORM\OneToMany(mappedBy: 'answer', targetEntity: UserAnswer::class, orphanRemoval: true)]
+    private Collection $userAnswers;
 
     public function __construct()
     {
-        $this->studentAnswers = new ArrayCollection();
+        $this->userAnswers = new ArrayCollection();
     }
 
     public function getId(): ?int
@@ -50,14 +64,14 @@ class Answer
         return $this->id;
     }
 
-    public function getContent(): ?string
+    public function getText(): ?string
     {
-        return $this->content;
+        return $this->text;
     }
 
-    public function setContent(string $content): static
+    public function setText(string $text): static
     {
-        $this->content = $content;
+        $this->text = $text;
 
         return $this;
     }
@@ -74,26 +88,14 @@ class Answer
         return $this;
     }
 
-    public function getPosition(): ?int
+    public function getOrderNumber(): ?int
     {
-        return $this->position;
+        return $this->orderNumber;
     }
 
-    public function setPosition(int $position): static
+    public function setOrderNumber(int $orderNumber): static
     {
-        $this->position = $position;
-
-        return $this;
-    }
-
-    public function getCreatedAt(): ?\DateTimeImmutable
-    {
-        return $this->createdAt;
-    }
-
-    public function setCreatedAt(\DateTimeImmutable $createdAt): static
-    {
-        $this->createdAt = $createdAt;
+        $this->orderNumber = $orderNumber;
 
         return $this;
     }
@@ -111,29 +113,29 @@ class Answer
     }
 
     /**
-     * @return Collection<int, StudentAnswer>
+     * @return Collection<int, UserAnswer>
      */
-    public function getStudentAnswers(): Collection
+    public function getUserAnswers(): Collection
     {
-        return $this->studentAnswers;
+        return $this->userAnswers;
     }
 
-    public function addStudentAnswer(StudentAnswer $studentAnswer): static
+    public function addUserAnswer(UserAnswer $userAnswer): static
     {
-        if (!$this->studentAnswers->contains($studentAnswer)) {
-            $this->studentAnswers->add($studentAnswer);
-            $studentAnswer->setAnswer($this);
+        if (!$this->userAnswers->contains($userAnswer)) {
+            $this->userAnswers->add($userAnswer);
+            $userAnswer->setAnswer($this);
         }
 
         return $this;
     }
 
-    public function removeStudentAnswer(StudentAnswer $studentAnswer): static
+    public function removeUserAnswer(UserAnswer $userAnswer): static
     {
-        if ($this->studentAnswers->removeElement($studentAnswer)) {
+        if ($this->userAnswers->removeElement($userAnswer)) {
             // set the owning side to null (unless already changed)
-            if ($studentAnswer->getAnswer() === $this) {
-                $studentAnswer->setAnswer(null);
+            if ($userAnswer->getAnswer() === $this) {
+                $userAnswer->setAnswer(null);
             }
         }
 

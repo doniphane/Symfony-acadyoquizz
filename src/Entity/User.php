@@ -5,95 +5,74 @@ namespace App\Entity;
 use ApiPlatform\Metadata\ApiResource;
 use ApiPlatform\Metadata\Get;
 use ApiPlatform\Metadata\GetCollection;
+use ApiPlatform\Metadata\Post;
 use ApiPlatform\Metadata\Put;
 use ApiPlatform\Metadata\Delete;
-use ApiPlatform\Metadata\Post;
-use ApiPlatform\Metadata\Patch;
-use App\State\UserPasswordHasher;
 use App\Repository\UserRepository;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
 use Symfony\Component\Security\Core\User\PasswordAuthenticatedUserInterface;
 use Symfony\Component\Security\Core\User\UserInterface;
-use Symfony\Component\Validator\Constraints as Assert;
-use Symfony\Bridge\Doctrine\Validator\Constraints\UniqueEntity;
 use Symfony\Component\Serializer\Annotation\Groups;
+use Lexik\Bundle\JWTAuthenticationBundle\Security\User\JWTUserInterface;
 
 #[ORM\Entity(repositoryClass: UserRepository::class)]
-#[ORM\Table(name: '`user`')]
-#[UniqueEntity(fields: ['email'], message: 'Cet email est déjà utilisé')]
 #[ApiResource(
     operations: [
-        new GetCollection(),
-        new Post(processor: UserPasswordHasher::class, validationContext: ['groups' => ['Default', 'user:create']]),
         new Get(),
-        new Put(processor: UserPasswordHasher::class),
-        new Patch(processor: UserPasswordHasher::class),
-        new Delete(),
+        new GetCollection(),
+        new Post(),
+        new Put(),
+        new Delete()
     ],
     normalizationContext: ['groups' => ['user:read']],
-    denormalizationContext: ['groups' => ['user:create', 'user:update']]
+    denormalizationContext: ['groups' => ['user:write']],
+    formats: ['jsonld', 'json']
 )]
-class User implements UserInterface, PasswordAuthenticatedUserInterface
+class User implements UserInterface, PasswordAuthenticatedUserInterface, JWTUserInterface
 {
-    #[Groups(['user:read'])]
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column]
+    #[Groups(['user:read'])]
     private ?int $id = null;
 
-    #[Assert\NotBlank(message: 'L\'email ne peut pas être vide')]
-    #[Assert\Email(message: 'Veuillez saisir un email valide')]
-    #[Groups(['user:read', 'user:create', 'user:update'])]
     #[ORM\Column(length: 180, unique: true)]
+    #[Groups(['user:read', 'user:write'])]
     private ?string $email = null;
 
-
-    #[Assert\NotBlank(message: 'Le mot de passe ne peut pas être vide', groups: ['user:create'])]
-    #[Assert\Length(min: 6, minMessage: 'Le mot de passe doit faire au moins 6 caractères')]
-    #[Groups(['user:create', 'user:update'])]
     #[ORM\Column]
-    private ?string $password = null;
-
-    #[Assert\Length(min: 2, max: 255, minMessage: 'Le prénom doit faire au moins 2 caractères')]
-    #[Groups(['user:read', 'user:create', 'user:update'])]
-    #[ORM\Column(length: 255, nullable: true)]
-    private ?string $firtName = null;
-
-    #[Assert\Length(min: 2, max: 255, minMessage: 'Le nom doit faire au moins 2 caractères')]
-    #[Groups(['user:read', 'user:create', 'user:update'])]
-    #[ORM\Column(length: 255, nullable: true)]
-    private ?string $lastName = null;
-
-    #[Groups(['user:read', 'user:create', 'user:update'])]
-    #[ORM\Column(type: 'json')]
+    #[Groups(['user:read'])]
     private array $roles = [];
 
-    #[Groups(['user:read'])]
+    /**
+     * @var string The hashed password
+     */
     #[ORM\Column]
-    private ?\DateTimeImmutable $createdAt = null;
+    #[Groups(['user:write'])]
+    private ?string $password = null;
 
+    #[ORM\Column(length: 255)]
+    #[Groups(['user:read', 'user:write'])]
+    private ?string $firstName = null;
+
+    #[ORM\Column(length: 255)]
+    #[Groups(['user:read', 'user:write'])]
+    private ?string $lastName = null;
+
+    #[ORM\OneToMany(mappedBy: 'user', targetEntity: QuizAttempt::class, orphanRemoval: true)]
     #[Groups(['user:read'])]
-    #[ORM\Column(nullable: true)]
-    private ?\DateTimeImmutable $updatedAt = null;
-
-    /**
-     * @var Collection<int, Quiz>
-     */
-    #[ORM\OneToMany(targetEntity: Quiz::class, mappedBy: 'teacher')]
-    private Collection $quizzes;
-
-    /**
-     * @var Collection<int, QuizAttempt>
-     */
-    #[ORM\OneToMany(targetEntity: QuizAttempt::class, mappedBy: 'student', orphanRemoval: true)]
     private Collection $quizAttempts;
+
+    #[ORM\OneToMany(mappedBy: 'createdBy', targetEntity: Quiz::class, orphanRemoval: true)]
+    #[Groups(['user:read'])]
+    private Collection $quizzes;
 
     public function __construct()
     {
-        $this->quizzes = new ArrayCollection();
         $this->quizAttempts = new ArrayCollection();
+        $this->quizzes = new ArrayCollection();
     }
 
     public function getId(): ?int
@@ -113,46 +92,23 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
         return $this;
     }
 
-    public function getPassword(): ?string
+    /**
+     * A visual identifier that represents this user.
+     *
+     * @see UserInterface
+     */
+    public function getUserIdentifier(): string
     {
-        return $this->password;
+        return (string) $this->email;
     }
 
-    public function setPassword(string $password): static
-    {
-        $this->password = $password;
-
-        return $this;
-    }
-
-    public function getFirtName(): ?string
-    {
-        return $this->firtName;
-    }
-
-    public function setFirtName(?string $firtName): static
-    {
-        $this->firtName = $firtName;
-
-        return $this;
-    }
-
-    public function getLastName(): ?string
-    {
-        return $this->lastName;
-    }
-
-    public function setLastName(?string $lastName): static
-    {
-        $this->lastName = $lastName;
-
-        return $this;
-    }
-
+    /**
+     * @see UserInterface
+     */
     public function getRoles(): array
     {
         $roles = $this->roles;
-
+        // guarantee every user at least has ROLE_USER
         $roles[] = 'ROLE_USER';
 
         return array_unique($roles);
@@ -165,56 +121,50 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
         return $this;
     }
 
-    public function getCreatedAt(): ?\DateTimeImmutable
+    /**
+     * @see PasswordAuthenticatedUserInterface
+     */
+    public function getPassword(): string
     {
-        return $this->createdAt;
+        return $this->password;
     }
 
-    public function setCreatedAt(\DateTimeImmutable $createdAt): static
+    public function setPassword(string $password): static
     {
-        $this->createdAt = $createdAt;
-
-        return $this;
-    }
-
-    public function getUpdatedAt(): ?\DateTimeImmutable
-    {
-        return $this->updatedAt;
-    }
-
-    public function setUpdatedAt(?\DateTimeImmutable $updatedAt): static
-    {
-        $this->updatedAt = $updatedAt;
+        $this->password = $password;
 
         return $this;
     }
 
     /**
-     * @return Collection<int, Quiz>
+     * @see UserInterface
      */
-    public function getQuizzes(): Collection
+    public function eraseCredentials(): void
     {
-        return $this->quizzes;
+        // If you store any temporary, sensitive data on the user, clear it here
+        // $this->plainPassword = null;
     }
 
-    public function addQuiz(Quiz $quiz): static
+    public function getFirstName(): ?string
     {
-        if (!$this->quizzes->contains($quiz)) {
-            $this->quizzes->add($quiz);
-            $quiz->setTeacher($this);
-        }
+        return $this->firstName;
+    }
+
+    public function setFirstName(string $firstName): static
+    {
+        $this->firstName = $firstName;
 
         return $this;
     }
 
-    public function removeQuiz(Quiz $quiz): static
+    public function getLastName(): ?string
     {
-        if ($this->quizzes->removeElement($quiz)) {
+        return $this->lastName;
+    }
 
-            if ($quiz->getTeacher() === $this) {
-                $quiz->setTeacher(null);
-            }
-        }
+    public function setLastName(string $lastName): static
+    {
+        $this->lastName = $lastName;
 
         return $this;
     }
@@ -231,7 +181,7 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     {
         if (!$this->quizAttempts->contains($quizAttempt)) {
             $this->quizAttempts->add($quizAttempt);
-            $quizAttempt->setStudent($this);
+            $quizAttempt->setUser($this);
         }
 
         return $this;
@@ -240,24 +190,56 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface
     public function removeQuizAttempt(QuizAttempt $quizAttempt): static
     {
         if ($this->quizAttempts->removeElement($quizAttempt)) {
-
-            if ($quizAttempt->getStudent() === $this) {
-                $quizAttempt->setStudent(null);
+            // set the owning side to null (unless already changed)
+            if ($quizAttempt->getUser() === $this) {
+                $quizAttempt->setUser(null);
             }
         }
 
         return $this;
     }
 
-
-    public function getUserIdentifier(): string
+    /**
+     * @return Collection<int, Quiz>
+     */
+    public function getQuizzes(): Collection
     {
-        return (string) $this->email;
+        return $this->quizzes;
     }
 
-    public function eraseCredentials(): void
+    public function addQuiz(Quiz $quiz): static
     {
+        if (!$this->quizzes->contains($quiz)) {
+            $this->quizzes->add($quiz);
+            $quiz->setCreatedBy($this);
+        }
 
+        return $this;
+    }
 
+    public function removeQuiz(Quiz $quiz): static
+    {
+        if ($this->quizzes->removeElement($quiz)) {
+            // set the owning side to null (unless already changed)
+            if ($quiz->getCreatedBy() === $this) {
+                $quiz->setCreatedBy(null);
+            }
+        }
+
+        return $this;
+    }
+
+    /**
+     * Créer un utilisateur à partir du payload JWT
+     */
+    public static function createFromPayload($username, array $payload): self
+    {
+        $user = new self();
+        $user->setEmail($username);
+        $user->setFirstName($payload['firstName'] ?? '');
+        $user->setLastName($payload['lastName'] ?? '');
+        $user->setRoles($payload['roles'] ?? ['ROLE_USER']);
+
+        return $user;
     }
 }

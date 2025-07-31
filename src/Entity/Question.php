@@ -3,56 +3,63 @@
 namespace App\Entity;
 
 use ApiPlatform\Metadata\ApiResource;
+use ApiPlatform\Metadata\Get;
+use ApiPlatform\Metadata\GetCollection;
+use ApiPlatform\Metadata\Post;
+use ApiPlatform\Metadata\Put;
+use ApiPlatform\Metadata\Delete;
+use ApiPlatform\Metadata\ApiProperty;
 use App\Repository\QuestionRepository;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
-use Doctrine\DBAL\Types\Types;
 use Doctrine\ORM\Mapping as ORM;
+use Symfony\Component\Serializer\Annotation\Groups;
 
 #[ORM\Entity(repositoryClass: QuestionRepository::class)]
-#[ApiResource]
+#[ApiResource(
+    operations: [
+        new Get(),
+        new GetCollection(),
+        new Post(),
+        new Put(),
+        new Delete()
+    ],
+    normalizationContext: ['groups' => ['question:read']],
+    denormalizationContext: ['groups' => ['question:write']]
+)]
 class Question
 {
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column]
+    #[Groups(['question:read'])]
     private ?int $id = null;
 
-    #[ORM\Column(type: Types::TEXT)]
-    private ?string $content = null;
-
-    #[ORM\Column(length: 20)]
-    private ?string $type = null;
+    #[ORM\Column(type: 'text')]
+    #[Groups(['question:read', 'question:write'])]
+    private ?string $text = null;
 
     #[ORM\Column]
-    private ?int $points = null;
-
-    #[ORM\Column]
-    private ?int $position = null;
-
-    #[ORM\Column]
-    private ?\DateTimeImmutable $createdAt = null;
+    #[Groups(['question:read', 'question:write'])]
+    private ?int $orderNumber = null;
 
     #[ORM\ManyToOne(inversedBy: 'questions')]
     #[ORM\JoinColumn(nullable: false)]
+    #[Groups(['question:read', 'question:write'])]
     private ?Quiz $quiz = null;
 
-    /**
-     * @var Collection<int, Answer>
-     */
-    #[ORM\OneToMany(targetEntity: Answer::class, mappedBy: 'question', orphanRemoval: true)]
+    #[ORM\OneToMany(mappedBy: 'question', targetEntity: Answer::class, orphanRemoval: true)]
+    #[Groups(['question:read'])]
+    #[ApiProperty(readableLink: true, writableLink: false)]
     private Collection $answers;
 
-    /**
-     * @var Collection<int, StudentAnswer>
-     */
-    #[ORM\OneToMany(targetEntity: StudentAnswer::class, mappedBy: 'question')]
-    private Collection $studentAnswers;
+    #[ORM\OneToMany(mappedBy: 'question', targetEntity: UserAnswer::class, orphanRemoval: true)]
+    private Collection $userAnswers;
 
     public function __construct()
     {
         $this->answers = new ArrayCollection();
-        $this->studentAnswers = new ArrayCollection();
+        $this->userAnswers = new ArrayCollection();
     }
 
     public function getId(): ?int
@@ -60,62 +67,26 @@ class Question
         return $this->id;
     }
 
-    public function getContent(): ?string
+    public function getText(): ?string
     {
-        return $this->content;
+        return $this->text;
     }
 
-    public function setContent(string $content): static
+    public function setText(string $text): static
     {
-        $this->content = $content;
+        $this->text = $text;
 
         return $this;
     }
 
-    public function getType(): ?string
+    public function getOrderNumber(): ?int
     {
-        return $this->type;
+        return $this->orderNumber;
     }
 
-    public function setType(string $type): static
+    public function setOrderNumber(int $orderNumber): static
     {
-        $this->type = $type;
-
-        return $this;
-    }
-
-    public function getPoints(): ?int
-    {
-        return $this->points;
-    }
-
-    public function setPoints(int $points): static
-    {
-        $this->points = $points;
-
-        return $this;
-    }
-
-    public function getPosition(): ?int
-    {
-        return $this->position;
-    }
-
-    public function setPosition(int $position): static
-    {
-        $this->position = $position;
-
-        return $this;
-    }
-
-    public function getCreatedAt(): ?\DateTimeImmutable
-    {
-        return $this->createdAt;
-    }
-
-    public function setCreatedAt(\DateTimeImmutable $createdAt): static
-    {
-        $this->createdAt = $createdAt;
+        $this->orderNumber = $orderNumber;
 
         return $this;
     }
@@ -163,29 +134,29 @@ class Question
     }
 
     /**
-     * @return Collection<int, StudentAnswer>
+     * @return Collection<int, UserAnswer>
      */
-    public function getStudentAnswers(): Collection
+    public function getUserAnswers(): Collection
     {
-        return $this->studentAnswers;
+        return $this->userAnswers;
     }
 
-    public function addStudentAnswer(StudentAnswer $studentAnswer): static
+    public function addUserAnswer(UserAnswer $userAnswer): static
     {
-        if (!$this->studentAnswers->contains($studentAnswer)) {
-            $this->studentAnswers->add($studentAnswer);
-            $studentAnswer->setQuestion($this);
+        if (!$this->userAnswers->contains($userAnswer)) {
+            $this->userAnswers->add($userAnswer);
+            $userAnswer->setQuestion($this);
         }
 
         return $this;
     }
 
-    public function removeStudentAnswer(StudentAnswer $studentAnswer): static
+    public function removeUserAnswer(UserAnswer $userAnswer): static
     {
-        if ($this->studentAnswers->removeElement($studentAnswer)) {
+        if ($this->userAnswers->removeElement($userAnswer)) {
             // set the owning side to null (unless already changed)
-            if ($studentAnswer->getQuestion() === $this) {
-                $studentAnswer->setQuestion(null);
+            if ($userAnswer->getQuestion() === $this) {
+                $userAnswer->setQuestion(null);
             }
         }
 
