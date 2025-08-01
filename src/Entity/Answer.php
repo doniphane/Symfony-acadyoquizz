@@ -31,19 +31,19 @@ class Answer
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column]
-    #[Groups(['answer:read'])]
+    #[Groups(['answer:read', 'quiz:read'])]
     private ?int $id = null;
 
     #[ORM\Column(type: 'text')]
-    #[Groups(['answer:read', 'answer:write'])]
+    #[Groups(['answer:read', 'answer:write', 'quiz:read'])]
     private ?string $text = null;
 
     #[ORM\Column]
-    #[Groups(['answer:read', 'answer:write'])]
+    #[Groups(['answer:read', 'answer:write', 'quiz:read'])]
     private ?bool $isCorrect = false;
 
     #[ORM\Column]
-    #[Groups(['answer:read', 'answer:write'])]
+    #[Groups(['answer:read', 'answer:write', 'quiz:read'])]
     private ?int $orderNumber = null;
 
     #[ORM\ManyToOne(inversedBy: 'answers')]
@@ -76,6 +76,7 @@ class Answer
         return $this;
     }
 
+    #[Groups(['answer:read', 'quiz:read'])]
     public function isCorrect(): ?bool
     {
         return $this->isCorrect;

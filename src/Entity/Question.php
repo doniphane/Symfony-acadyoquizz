@@ -32,15 +32,15 @@ class Question
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column]
-    #[Groups(['question:read'])]
+    #[Groups(['question:read', 'quiz:read'])]
     private ?int $id = null;
 
     #[ORM\Column(type: 'text')]
-    #[Groups(['question:read', 'question:write'])]
+    #[Groups(['question:read', 'question:write', 'quiz:read'])]
     private ?string $text = null;
 
     #[ORM\Column]
-    #[Groups(['question:read', 'question:write'])]
+    #[Groups(['question:read', 'question:write', 'quiz:read'])]
     private ?int $orderNumber = null;
 
     #[ORM\ManyToOne(inversedBy: 'questions')]
@@ -49,7 +49,7 @@ class Question
     private ?Quiz $quiz = null;
 
     #[ORM\OneToMany(mappedBy: 'question', targetEntity: Answer::class, orphanRemoval: true)]
-    #[Groups(['question:read'])]
+    #[Groups(['question:read', 'quiz:read'])]
     #[ApiProperty(readableLink: true, writableLink: false)]
     private Collection $answers;
 

@@ -8,7 +8,6 @@ use App\Entity\Quiz;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\SecurityBundle\Security;
 
-
 class QuizDataProvider implements ProviderInterface
 {
     public function __construct(
@@ -19,88 +18,26 @@ class QuizDataProvider implements ProviderInterface
 
     public function provide(Operation $operation, array $uriVariables = [], array $context = []): object|array|null
     {
+        $user = $this->security->getUser();
 
-        $user = $this->getConnectedUser();
         if (!$user) {
             return null;
         }
 
+        // Pour les opérations GET sur un quiz spécifique
+        if (isset($uriVariables['id'])) {
+            // Récupérer le quiz
+            $quiz = $this->entityManager->getRepository(Quiz::class)->find($uriVariables['id']);
 
-        if ($this->isRequestingSpecificQuiz($uriVariables)) {
-            return $this->getQuizWithDetails($uriVariables['id'], $user);
+            if (!$quiz || $quiz->getCreatedBy() !== $user) {
+                return null;
+            }
+
+
+            return $quiz;
         }
 
-
-        return $this->getAllUserQuizzes($user);
-    }
-
-
-    private function getConnectedUser()
-    {
-        return $this->security->getUser();
-    }
-
-
-    private function isRequestingSpecificQuiz(array $uriVariables): bool
-    {
-        return isset($uriVariables['id']);
-    }
-
-
-    private function getQuizWithDetails(int $quizId, $user): ?Quiz
-    {
-
-        $quiz = $this->findQuiz($quizId);
-
-        if (!$quiz) {
-            return null;
-        }
-
-        // Vérifier que l'utilisateur est propriétaire
-        if (!$this->isQuizOwner($quiz, $user)) {
-            return null; // Pas autorisé
-        }
-
-
-        $this->loadQuizQuestions($quiz);
-
-        return $quiz;
-    }
-
-
-    private function findQuiz(int $quizId): ?Quiz
-    {
-        return $this->entityManager
-            ->getRepository(Quiz::class)
-            ->find($quizId);
-    }
-
-    // Vérifier si l'utilisateur est propriétaire du quiz
-    private function isQuizOwner(Quiz $quiz, $user): bool
-    {
-        return $quiz->getCreatedBy() === $user;
-    }
-
-
-    private function loadQuizQuestions(Quiz $quiz): void
-    {
-        // Requête pour charger les questions avec leurs réponses
-        $this->entityManager
-            ->getRepository(Quiz::class)
-            ->createQueryBuilder('q')
-            ->leftJoin('q.questions', 'questions')
-            ->leftJoin('questions.answers', 'answers')
-            ->where('q.id = :id')
-            ->setParameter('id', $quiz->getId())
-            ->getQuery()
-            ->getResult();
-    }
-
-
-    private function getAllUserQuizzes($user): array
-    {
-        return $this->entityManager
-            ->getRepository(Quiz::class)
-            ->findBy(['createdBy' => $user]);
+        // Pour les opérations GET sur la collection
+        return $this->entityManager->getRepository(Quiz::class)->findBy(['createdBy' => $user]);
     }
 }

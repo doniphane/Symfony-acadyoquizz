@@ -9,7 +9,10 @@ use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\SecurityBundle\Security;
 use Symfony\Component\HttpFoundation\Exception\BadRequestException;
 
-
+/**
+ * Processeur personnalisé pour la mise à jour des quiz
+ * Gère uniquement les champs envoyés dans la requête
+ */
 class QuizUpdateProcessor implements ProcessorInterface
 {
     public function __construct(
@@ -20,79 +23,57 @@ class QuizUpdateProcessor implements ProcessorInterface
 
     public function process($data, Operation $operation, array $uriVariables = [], array $context = [])
     {
+        // Vérifier que c'est bien un Quiz
+        if (!$data instanceof Quiz) {
+            throw new BadRequestException('Invalid data type');
+        }
 
-        $this->validateRequest($data, $uriVariables);
+        // Vérifier que l'utilisateur est connecté et admin
+        if (!$this->security->isGranted('ROLE_ADMIN')) {
+            throw new BadRequestException('Access denied');
+        }
 
-        $originalQuiz = $this->getOriginalQuiz($uriVariables['id']);
+        // Récupérer le quiz original depuis la base de données
+        $quizId = $uriVariables['id'] ?? null;
+        if (!$quizId) {
+            throw new BadRequestException('Quiz ID is required');
+        }
 
+        $originalQuiz = $this->entityManager->find(Quiz::class, $quizId);
+        if (!$originalQuiz) {
+            throw new BadRequestException('Quiz not found');
+        }
 
-        $this->checkPermissions($originalQuiz);
+        // Vérifier que l'utilisateur est le propriétaire du quiz
+        if ($originalQuiz->getCreatedBy() !== $this->security->getUser()) {
+            throw new BadRequestException('You can only update your own quizzes');
+        }
 
+        // Mettre à jour seulement les champs qui ne sont pas null dans $data
+        if ($data->getTitle() !== null) {
+            $originalQuiz->setTitle($data->getTitle());
+        }
 
-        $this->updateQuizFields($originalQuiz, $data);
+        if ($data->getDescription() !== null) {
+            $originalQuiz->setDescription($data->getDescription());
+        }
 
+        if ($data->isActive() !== null) {
+            $originalQuiz->setIsActive($data->isActive());
+        }
 
+        if ($data->isStarted() !== null) {
+            $originalQuiz->setIsStarted($data->isStarted());
+        }
+
+        if ($data->getPassingScore() !== null) {
+            $originalQuiz->setPassingScore($data->getPassingScore());
+        }
+
+        // Sauvegarder les modifications
         $this->entityManager->flush();
 
+        // Retourner le quiz mis à jour
         return $originalQuiz;
-    }
-
-    // Vérifier que la requête est valide
-    private function validateRequest($data, array $uriVariables): void
-    {
-        if (!$data instanceof Quiz) {
-            throw new BadRequestException('Type de données invalide');
-        }
-
-        if (!isset($uriVariables['id'])) {
-            throw new BadRequestException('ID du quiz manquant');
-        }
-    }
-
-
-    private function getOriginalQuiz(int $quizId): Quiz
-    {
-        $quiz = $this->entityManager->find(Quiz::class, $quizId);
-
-        if (!$quiz) {
-            throw new BadRequestException('Quiz non trouvé');
-        }
-
-        return $quiz;
-    }
-
-    private function checkPermissions(Quiz $quiz): void
-    {
-        // Vérifier que l'utilisateur est admin
-        if (!$this->security->isGranted('ROLE_ADMIN')) {
-            throw new BadRequestException('Accès refusé');
-        }
-
-        // Vérifier que c'est son quiz
-        if ($quiz->getCreatedBy() !== $this->security->getUser()) {
-            throw new BadRequestException('Vous ne pouvez modifier que vos propres quiz');
-        }
-    }
-
-
-    private function updateQuizFields(Quiz $originalQuiz, Quiz $newData): void
-    {
-        // Liste des champs à vérifier et leurs setters
-        $fieldsToUpdate = [
-            'getTitle' => 'setTitle',
-            'getDescription' => 'setDescription',
-            'isActive' => 'setIsActive',
-            'isStarted' => 'setIsStarted',
-            'getPassingScore' => 'setPassingScore'
-        ];
-
-        // Mettre à jour chaque champ s'il n'est pas null
-        foreach ($fieldsToUpdate as $getter => $setter) {
-            $newValue = $newData->$getter();
-
-            if ($newValue !== null) {
-                $originalQuiz->$setter($newValue);
-            }
-        }
     }
 }

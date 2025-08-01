@@ -18,6 +18,7 @@ use Symfony\Component\Serializer\Annotation\SerializedName;
 use App\State\QuizDataPersister;
 use App\State\QuizDataProvider;
 use App\State\QuizUpdateProcessor;
+use App\State\QuizPublicDataProvider;
 
 #[ORM\Entity(repositoryClass: QuizRepository::class)]
 #[ApiResource(
@@ -29,10 +30,36 @@ use App\State\QuizUpdateProcessor;
             processor: QuizUpdateProcessor::class,
             denormalizationContext: ['groups' => ['quiz:update']]
         ),
-        new Delete()
+        new Delete(
+            security: "is_granted('ROLE_ADMIN') and object.getCreatedBy() == user"
+        )
     ],
     normalizationContext: ['groups' => ['quiz:read']],
     denormalizationContext: ['groups' => ['quiz:write']],
+    formats: ['jsonld', 'json']
+)]
+#[ApiResource(
+    uriTemplate: '/public/quizzes',
+    operations: [
+        new GetCollection(provider: QuizPublicDataProvider::class),
+    ],
+    normalizationContext: ['groups' => ['quiz:read']],
+    formats: ['jsonld', 'json']
+)]
+#[ApiResource(
+    uriTemplate: '/public/quizzes/{id}',
+    operations: [
+        new Get(provider: QuizPublicDataProvider::class),
+    ],
+    normalizationContext: ['groups' => ['quiz:read']],
+    formats: ['jsonld', 'json']
+)]
+#[ApiResource(
+    uriTemplate: '/public/quizzes/by-code/{code}',
+    operations: [
+        new Get(provider: QuizPublicDataProvider::class),
+    ],
+    normalizationContext: ['groups' => ['quiz:read']],
     formats: ['jsonld', 'json']
 )]
 class Quiz

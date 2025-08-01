@@ -16,8 +16,8 @@ use Symfony\Component\PasswordHasher\Hasher\UserPasswordHasherInterface;
 
 class ApiAuthController extends AbstractController
 {
-    #[Route('/api/me', name: 'api_me', methods: ['GET'])]
-    public function me(TokenStorageInterface $tokenStorage, JWTTokenManagerInterface $jwtManager): JsonResponse
+    #[Route('/api/verify-token', name: 'api_verify_token', methods: ['GET'])]
+    public function verifyToken(TokenStorageInterface $tokenStorage, EntityManagerInterface $entityManager): JsonResponse
     {
         $token = $tokenStorage->getToken();
 
@@ -31,13 +31,21 @@ class ApiAuthController extends AbstractController
             return new JsonResponse(['error' => 'Invalid user'], Response::HTTP_UNAUTHORIZED);
         }
 
+        // Récupérer l'utilisateur à jour depuis la base de données
+        $freshUser = $entityManager->getRepository(User::class)->find($user->getId());
+
+        if (!$freshUser) {
+            return new JsonResponse(['error' => 'User not found'], Response::HTTP_NOT_FOUND);
+        }
+
         return new JsonResponse([
+            'valid' => true,
             'user' => [
-                'id' => $user->getId(),
-                'email' => $user->getEmail(),
-                'firstName' => $user->getFirstName(),
-                'lastName' => $user->getLastName(),
-                'roles' => $user->getRoles(),
+                'id' => $freshUser->getId(),
+                'email' => $freshUser->getEmail(),
+                'firstName' => $freshUser->getFirstName(),
+                'lastName' => $freshUser->getLastName(),
+                'roles' => $freshUser->getRoles(),
             ]
         ]);
     }
