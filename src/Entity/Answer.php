@@ -13,6 +13,7 @@ use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
 use Symfony\Component\Serializer\Annotation\Groups;
+use Symfony\Component\Validator\Constraints as Assert;
 
 #[ORM\Entity(repositoryClass: AnswerRepository::class)]
 #[ApiResource(
@@ -36,19 +37,53 @@ class Answer
 
     #[ORM\Column(type: 'text')]
     #[Groups(['answer:read', 'answer:write', 'quiz:read'])]
+    #[Assert\NotBlank(message: 'Le texte de la réponse est obligatoire.')]
+    #[Assert\Length(
+        min: 1,
+        max: 1000,
+        minMessage: 'La réponse doit contenir au moins {{ limit }} caractère.',
+        maxMessage: 'La réponse ne peut pas dépasser {{ limit }} caractères.'
+    )]
+    #[Assert\NotRegex(
+        pattern: '/[<>{}"\\\\\[\]`]/',
+        message: 'La réponse contient des caractères non autorisés.'
+    )]
+    #[Assert\NotRegex(
+        pattern: '/(javascript:|data:|vbscript:|onload=|onerror=)/i',
+        message: 'La réponse contient du contenu potentiellement dangereux.'
+    )]
     private ?string $text = null;
 
     #[ORM\Column]
     #[Groups(['answer:read', 'answer:write', 'quiz:read'])]
+    #[Assert\NotNull(message: 'Le statut de correction est obligatoire.')]
+    #[Assert\Type(
+        type: 'bool',
+        message: 'Le statut de correction doit être un booléen (true/false).'
+    )]
     private ?bool $isCorrect = false;
 
     #[ORM\Column]
     #[Groups(['answer:read', 'answer:write', 'quiz:read'])]
+    #[Assert\NotNull(message: 'Le numéro d\'ordre est obligatoire.')]
+    #[Assert\Type(
+        type: 'integer',
+        message: 'Le numéro d\'ordre doit être un nombre entier.'
+    )]
+    #[Assert\Positive(
+        message: 'Le numéro d\'ordre doit être un nombre positif.'
+    )]
+    #[Assert\Range(
+        min: 1,
+        max: 50,
+        notInRangeMessage: 'Le numéro d\'ordre doit être entre {{ min }} et {{ max }}.'
+    )]
     private ?int $orderNumber = null;
 
     #[ORM\ManyToOne(inversedBy: 'answers')]
     #[ORM\JoinColumn(nullable: false)]
     #[Groups(['answer:read', 'answer:write'])]
+    #[Assert\NotNull(message: 'La question associée est obligatoire.')]
     private ?Question $question = null;
 
     #[ORM\OneToMany(mappedBy: 'answer', targetEntity: UserAnswer::class, orphanRemoval: true)]
@@ -71,7 +106,16 @@ class Answer
 
     public function setText(string $text): static
     {
-        $this->text = $text;
+        // Nettoyer et sécuriser le texte
+        $cleanText = trim($text);
+
+        // Supprimer les caractères de contrôle dangereux
+        $cleanText = preg_replace('/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/', '', $cleanText);
+
+        // Encoder les entités HTML pour éviter les injections XSS
+        $cleanText = htmlspecialchars($cleanText, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+
+        $this->text = $cleanText;
 
         return $this;
     }
@@ -96,6 +140,13 @@ class Answer
 
     public function setOrderNumber(int $orderNumber): static
     {
+        // Valider et sécuriser le numéro d'ordre
+        if ($orderNumber < 1) {
+            $orderNumber = 1;
+        } elseif ($orderNumber > 50) {
+            $orderNumber = 50;
+        }
+
         $this->orderNumber = $orderNumber;
 
         return $this;
@@ -141,5 +192,42 @@ class Answer
         }
 
         return $this;
+    }
+
+    /**
+     * Méthode utilitaire pour valider qu'une question a au moins une réponse correcte
+     */
+    public function validateQuestionHasCorrectAnswer(): bool
+    {
+        if (!$this->question) {
+            return false;
+        }
+
+        foreach ($this->question->getAnswers() as $answer) {
+            if ($answer->isCorrect()) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * Méthode utilitaire pour compter les réponses correctes d'une question
+     */
+    public function countCorrectAnswersInQuestion(): int
+    {
+        if (!$this->question) {
+            return 0;
+        }
+
+        $count = 0;
+        foreach ($this->question->getAnswers() as $answer) {
+            if ($answer->isCorrect()) {
+                $count++;
+            }
+        }
+
+        return $count;
     }
 }

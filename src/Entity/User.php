@@ -15,6 +15,8 @@ use Doctrine\ORM\Mapping as ORM;
 use Symfony\Component\Security\Core\User\PasswordAuthenticatedUserInterface;
 use Symfony\Component\Security\Core\User\UserInterface;
 use Symfony\Component\Serializer\Annotation\Groups;
+use Symfony\Component\Validator\Constraints as Assert;
+use Symfony\Bridge\Doctrine\Validator\Constraints\UniqueEntity;
 use Lexik\Bundle\JWTAuthenticationBundle\Security\User\JWTUserInterface;
 
 #[ORM\Entity(repositoryClass: UserRepository::class)]
@@ -30,6 +32,10 @@ use Lexik\Bundle\JWTAuthenticationBundle\Security\User\JWTUserInterface;
     denormalizationContext: ['groups' => ['user:write']],
     formats: ['jsonld', 'json']
 )]
+#[UniqueEntity(
+    fields: ['email'],
+    message: 'Cette adresse email est déjà utilisée.'
+)]
 class User implements UserInterface, PasswordAuthenticatedUserInterface, JWTUserInterface
 {
     #[ORM\Id]
@@ -40,10 +46,30 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface, JWTUser
 
     #[ORM\Column(length: 180, unique: true)]
     #[Groups(['user:read', 'user:write'])]
+    #[Assert\NotBlank(message: 'L\'adresse email est obligatoire.')]
+    #[Assert\Email(message: 'L\'adresse email {{ value }} n\'est pas valide.')]
+    #[Assert\Length(
+        max: 180,
+        maxMessage: 'L\'adresse email ne peut pas dépasser {{ limit }} caractères.'
+    )]
+    #[Assert\Regex(
+        pattern: '/^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/',
+        message: 'L\'adresse email contient des caractères non autorisés.'
+    )]
     private ?string $email = null;
 
     #[ORM\Column]
     #[Groups(['user:read'])]
+    #[Assert\Type(
+        type: 'array',
+        message: 'Les rôles doivent être un tableau.'
+    )]
+    #[Assert\All([
+        new Assert\Choice(
+            choices: ['ROLE_USER', 'ROLE_ADMIN', 'ROLE_MODERATOR'],
+            message: 'Le rôle {{ value }} n\'est pas autorisé.'
+        )
+    ])]
     private array $roles = [];
 
     /**
@@ -51,14 +77,58 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface, JWTUser
      */
     #[ORM\Column]
     #[Groups(['user:write'])]
+    #[Assert\NotBlank(message: 'Le mot de passe est obligatoire.')]
+    #[Assert\Length(
+        min: 6,
+        max: 255,
+        minMessage: 'Le mot de passe doit contenir au moins {{ limit }} caractères.',
+        maxMessage: 'Le mot de passe ne peut pas dépasser {{ limit }} caractères.'
+    )]
+    #[Assert\Regex(
+        pattern: '/^(?=.*[a-zA-Z])(?=.*\d)/',
+        message: 'Le mot de passe doit contenir au moins une lettre et un chiffre.'
+    )]
+    #[Assert\NotCompromisedPassword(
+        message: 'Ce mot de passe a été compromis dans une fuite de données. Veuillez en choisir un autre.'
+    )]
     private ?string $password = null;
 
     #[ORM\Column(length: 255)]
     #[Groups(['user:read', 'user:write'])]
+    #[Assert\NotBlank(message: 'Le prénom est obligatoire.')]
+    #[Assert\Length(
+        min: 2,
+        max: 255,
+        minMessage: 'Le prénom doit contenir au moins {{ limit }} caractères.',
+        maxMessage: 'Le prénom ne peut pas dépasser {{ limit }} caractères.'
+    )]
+    #[Assert\Regex(
+        pattern: '/^[a-zA-ZÀ-ÿ\s\'-]+$/u',
+        message: 'Le prénom ne peut contenir que des lettres, espaces, apostrophes et tirets.'
+    )]
+    #[Assert\NotRegex(
+        pattern: '/[<>{}"\\\\\[\]]/',
+        message: 'Le prénom contient des caractères non autorisés.'
+    )]
     private ?string $firstName = null;
 
     #[ORM\Column(length: 255)]
     #[Groups(['user:read', 'user:write'])]
+    #[Assert\NotBlank(message: 'Le nom de famille est obligatoire.')]
+    #[Assert\Length(
+        min: 2,
+        max: 255,
+        minMessage: 'Le nom de famille doit contenir au moins {{ limit }} caractères.',
+        maxMessage: 'Le nom de famille ne peut pas dépasser {{ limit }} caractères.'
+    )]
+    #[Assert\Regex(
+        pattern: '/^[a-zA-ZÀ-ÿ\s\'-]+$/u',
+        message: 'Le nom de famille ne peut contenir que des lettres, espaces, apostrophes et tirets.'
+    )]
+    #[Assert\NotRegex(
+        pattern: '/[<>{}"\\\\\[\]]/',
+        message: 'Le nom de famille contient des caractères non autorisés.'
+    )]
     private ?string $lastName = null;
 
     #[ORM\OneToMany(mappedBy: 'user', targetEntity: QuizAttempt::class, orphanRemoval: true)]
@@ -87,7 +157,8 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface, JWTUser
 
     public function setEmail(string $email): static
     {
-        $this->email = $email;
+        // Nettoyer et sécuriser l'email
+        $this->email = filter_var(trim(strtolower($email)), FILTER_SANITIZE_EMAIL);
 
         return $this;
     }
@@ -116,7 +187,9 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface, JWTUser
 
     public function setRoles(array $roles): static
     {
-        $this->roles = $roles;
+        // Filtrer les rôles autorisés uniquement
+        $allowedRoles = ['ROLE_USER', 'ROLE_ADMIN', 'ROLE_MODERATOR'];
+        $this->roles = array_intersect($roles, $allowedRoles);
 
         return $this;
     }
@@ -152,7 +225,8 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface, JWTUser
 
     public function setFirstName(string $firstName): static
     {
-        $this->firstName = $firstName;
+        // Nettoyer le prénom
+        $this->firstName = trim(ucfirst(strtolower($firstName)));
 
         return $this;
     }
@@ -164,7 +238,8 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface, JWTUser
 
     public function setLastName(string $lastName): static
     {
-        $this->lastName = $lastName;
+        // Nettoyer le nom de famille
+        $this->lastName = trim(strtoupper($lastName));
 
         return $this;
     }
@@ -236,9 +311,14 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface, JWTUser
     {
         $user = new self();
         $user->setEmail($username);
-        $user->setFirstName($payload['firstName'] ?? '');
-        $user->setLastName($payload['lastName'] ?? '');
-        $user->setRoles($payload['roles'] ?? ['ROLE_USER']);
+        $user->setFirstName($payload['firstName'] ?? 'User');
+        $user->setLastName($payload['lastName'] ?? 'Default');
+
+        // Validation des rôles du payload
+        $roles = $payload['roles'] ?? ['ROLE_USER'];
+        $allowedRoles = ['ROLE_USER', 'ROLE_ADMIN', 'ROLE_MODERATOR'];
+        $validRoles = array_intersect($roles, $allowedRoles);
+        $user->setRoles($validRoles ?: ['ROLE_USER']);
 
         return $user;
     }

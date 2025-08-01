@@ -15,12 +15,18 @@ use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
 use Symfony\Component\Serializer\Annotation\Groups;
 use Symfony\Component\Serializer\Annotation\SerializedName;
+use Symfony\Component\Validator\Constraints as Assert;
+use Symfony\Bridge\Doctrine\Validator\Constraints\UniqueEntity;
 use App\State\QuizDataPersister;
 use App\State\QuizDataProvider;
 use App\State\QuizUpdateProcessor;
 use App\State\QuizPublicDataProvider;
 
 #[ORM\Entity(repositoryClass: QuizRepository::class)]
+#[UniqueEntity(
+    fields: ['accessCode'],
+    message: 'Ce code d\'accès est déjà utilisé.'
+)]
 #[ApiResource(
     operations: [
         new Get(),
@@ -72,45 +78,100 @@ class Quiz
 
     #[ORM\Column(length: 255)]
     #[Groups(['quiz:read', 'quiz:write', 'quiz:update'])]
+    #[Assert\NotBlank(message: 'Le titre ne peut pas être vide.')]
+    #[Assert\Length(
+        min: 3,
+        max: 255,
+        minMessage: 'Le titre doit contenir au moins {{ limit }} caractères.',
+        maxMessage: 'Le titre ne peut pas dépasser {{ limit }} caractères.'
+    )]
+    #[Assert\Regex(
+        pattern: '/^[a-zA-Z0-9\sÀ-ÿ\-_\.\!\?]+$/u',
+        message: 'Le titre contient des caractères non autorisés.'
+    )]
     private ?string $title = null;
 
     #[ORM\Column(type: 'text', nullable: true)]
     #[Groups(['quiz:read', 'quiz:write', 'quiz:update'])]
+    #[Assert\Length(
+        max: 2000,
+        maxMessage: 'La description ne peut pas dépasser {{ limit }} caractères.'
+    )]
+    #[Assert\Regex(
+        pattern: '/^[a-zA-Z0-9\s\n\rÀ-ÿ\-_\.\!\?\,\;\:\(\)\"\']+$/u',
+        message: 'La description contient des caractères non autorisés.'
+    )]
     private ?string $description = null;
 
     #[ORM\Column(length: 10, unique: true)]
     #[Groups(['quiz:read'])]
+    #[Assert\NotBlank(message: 'Le code d\'accès ne peut pas être vide.')]
+    #[Assert\Length(
+        min: 6,
+        max: 6,
+        exactMessage: 'Le code d\'accès doit contenir exactement {{ limit }} caractères.'
+    )]
+    #[Assert\Regex(
+        pattern: '/^[A-Z0-9]+$/',
+        message: 'Le code d\'accès ne peut contenir que des lettres majuscules et des chiffres.'
+    )]
     private ?string $accessCode = null;
 
     #[ORM\Column]
     #[Groups(['quiz:read', 'quiz:write', 'quiz:update'])]
+    #[Assert\Type(
+        type: 'bool',
+        message: 'La valeur doit être un booléen.'
+    )]
     private ?bool $isActive = true;
 
     #[ORM\Column]
     #[Groups(['quiz:read', 'quiz:write', 'quiz:update'])]
+    #[Assert\Type(
+        type: 'bool',
+        message: 'La valeur doit être un booléen.'
+    )]
     private ?bool $isStarted = false;
 
     #[ORM\Column]
     #[Groups(['quiz:read', 'quiz:write', 'quiz:update'])]
+    #[Assert\NotBlank(message: 'Le score de passage ne peut pas être vide.')]
+    #[Assert\Type(
+        type: 'integer',
+        message: 'Le score de passage doit être un nombre entier.'
+    )]
+    #[Assert\Range(
+        min: 0,
+        max: 100,
+        notInRangeMessage: 'Le score de passage doit être entre {{ min }}% et {{ max }}%.'
+    )]
     private ?int $passingScore = 70;
 
     #[ORM\Column]
     #[Groups(['quiz:read', 'quiz:write'])]
+    #[Assert\NotNull(message: 'La date de création ne peut pas être nulle.')]
+    #[Assert\Type(
+        type: \DateTimeImmutable::class,
+        message: 'La date de création doit être une date valide.'
+    )]
     private ?\DateTimeImmutable $createdAt = null;
 
     #[ORM\ManyToOne(inversedBy: 'quizzes')]
     #[ORM\JoinColumn(nullable: false)]
     #[Groups(['quiz:read'])]
+    #[Assert\NotNull(message: 'Le créateur du quiz ne peut pas être nul.')]
     private ?User $createdBy = null;
 
     #[ORM\OneToMany(mappedBy: 'quiz', targetEntity: Question::class, orphanRemoval: true)]
     #[Groups(['quiz:read'])]
     #[ApiProperty(readableLink: true, writableLink: false)]
+    #[Assert\Valid]
     private Collection $questions;
 
     #[ORM\OneToMany(mappedBy: 'quiz', targetEntity: QuizAttempt::class, orphanRemoval: true)]
     #[Groups(['quiz:read'])]
     #[ApiProperty(readableLink: true, writableLink: false)]
+    #[Assert\Valid]
     private Collection $quizAttempts;
 
     public function __construct()
@@ -130,8 +191,6 @@ class Quiz
         $this->accessCode = $this->generateAccessCode();
     }
 
-
-
     public function getId(): ?int
     {
         return $this->id;
@@ -144,7 +203,7 @@ class Quiz
 
     public function setTitle(string $title): static
     {
-        $this->title = $title;
+        $this->title = trim($title);
 
         return $this;
     }
@@ -156,7 +215,7 @@ class Quiz
 
     public function setDescription(?string $description): static
     {
-        $this->description = $description;
+        $this->description = $description ? trim($description) : null;
 
         return $this;
     }
@@ -168,7 +227,7 @@ class Quiz
 
     public function setAccessCode(string $accessCode): static
     {
-        $this->accessCode = $accessCode;
+        $this->accessCode = strtoupper(trim($accessCode));
 
         return $this;
     }
@@ -217,7 +276,7 @@ class Quiz
 
     public function setPassingScore(int $passingScore): static
     {
-        $this->passingScore = $passingScore;
+        $this->passingScore = max(0, min(100, $passingScore));
 
         return $this;
     }
@@ -309,7 +368,7 @@ class Quiz
     private function generateAccessCode(): string
     {
         // Génère un code d'accès de 6 caractères aléatoires
-        // Note: L'unicité est garantie par la contrainte unique en base de données
+
         $characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
         $code = '';
         for ($i = 0; $i < 6; $i++) {
