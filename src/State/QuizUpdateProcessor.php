@@ -5,9 +5,11 @@ namespace App\State;
 use ApiPlatform\Metadata\Operation;
 use ApiPlatform\State\ProcessorInterface;
 use App\Entity\Quiz;
+use App\Entity\User;
 use Doctrine\ORM\EntityManagerInterface;
-use Symfony\Bundle\SecurityBundle\Security;
+use Lexik\Bundle\JWTAuthenticationBundle\Services\JWTTokenManagerInterface;
 use Symfony\Component\HttpFoundation\Exception\BadRequestException;
+use Symfony\Component\HttpFoundation\RequestStack;
 
 /**
  * Processeur personnalisé pour la mise à jour des quiz
@@ -17,7 +19,8 @@ class QuizUpdateProcessor implements ProcessorInterface
 {
     public function __construct(
         private EntityManagerInterface $entityManager,
-        private Security $security
+        private JWTTokenManagerInterface $jwtManager,
+        private RequestStack $requestStack
     ) {
     }
 
@@ -28,9 +31,39 @@ class QuizUpdateProcessor implements ProcessorInterface
             throw new BadRequestException('Invalid data type');
         }
 
-        // Vérifier que l'utilisateur est connecté et admin
-        if (!$this->security->isGranted('ROLE_ADMIN')) {
-            throw new BadRequestException('Access denied');
+        // Récupérer le token JWT depuis les headers
+        $request = $this->requestStack->getCurrentRequest();
+        $authorizationHeader = $request->headers->get('Authorization');
+
+        if (!$authorizationHeader || !str_starts_with($authorizationHeader, 'Bearer ')) {
+            throw new BadRequestException('Token d\'authentification manquant');
+        }
+
+        $token = substr($authorizationHeader, 7); // Enlever "Bearer "
+
+        try {
+            // Décoder le token JWT pour obtenir les informations utilisateur
+            $payload = $this->jwtManager->parse($token);
+            $username = $payload['username'] ?? null;
+
+            if (!$username) {
+                throw new BadRequestException('Token invalide');
+            }
+
+            // Récupérer l'utilisateur depuis la base de données
+            $user = $this->entityManager->getRepository(User::class)->findOneBy(['email' => $username]);
+
+            if (!$user) {
+                throw new BadRequestException('Utilisateur non trouvé');
+            }
+
+            // Vérifier que l'utilisateur est admin
+            if (!in_array('ROLE_ADMIN', $user->getRoles())) {
+                throw new BadRequestException('Access denied - Admin role required');
+            }
+
+        } catch (\Exception $e) {
+            throw new BadRequestException('Erreur d\'authentification: ' . $e->getMessage());
         }
 
         // Récupérer le quiz original depuis la base de données
@@ -45,7 +78,7 @@ class QuizUpdateProcessor implements ProcessorInterface
         }
 
         // Vérifier que l'utilisateur est le propriétaire du quiz
-        if ($originalQuiz->getCreatedBy() !== $this->security->getUser()) {
+        if ($originalQuiz->getCreatedBy() !== $user) {
             throw new BadRequestException('You can only update your own quizzes');
         }
 

@@ -60,14 +60,7 @@ use App\State\QuizPublicDataProvider;
     normalizationContext: ['groups' => ['quiz:read']],
     formats: ['jsonld', 'json']
 )]
-#[ApiResource(
-    uriTemplate: '/public/quizzes/by-code/{code}',
-    operations: [
-        new Get(provider: QuizPublicDataProvider::class),
-    ],
-    normalizationContext: ['groups' => ['quiz:read']],
-    formats: ['jsonld', 'json']
-)]
+
 class Quiz
 {
     #[ORM\Id]
@@ -78,7 +71,6 @@ class Quiz
 
     #[ORM\Column(length: 255)]
     #[Groups(['quiz:read', 'quiz:write', 'quiz:update'])]
-    #[Assert\NotBlank(message: 'Le titre ne peut pas être vide.')]
     #[Assert\Length(
         min: 3,
         max: 255,
@@ -135,7 +127,6 @@ class Quiz
 
     #[ORM\Column]
     #[Groups(['quiz:read', 'quiz:write', 'quiz:update'])]
-    #[Assert\NotBlank(message: 'Le score de passage ne peut pas être vide.')]
     #[Assert\Type(
         type: 'integer',
         message: 'Le score de passage doit être un nombre entier.'
@@ -159,7 +150,6 @@ class Quiz
     #[ORM\ManyToOne(inversedBy: 'quizzes')]
     #[ORM\JoinColumn(nullable: false)]
     #[Groups(['quiz:read'])]
-    #[Assert\NotNull(message: 'Le créateur du quiz ne peut pas être nul.')]
     private ?User $createdBy = null;
 
     #[ORM\OneToMany(mappedBy: 'quiz', targetEntity: Question::class, orphanRemoval: true)]

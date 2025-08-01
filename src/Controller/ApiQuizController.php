@@ -16,6 +16,30 @@ use Symfony\Component\Routing\Annotation\Route;
 class ApiQuizController extends AbstractController
 {
     /**
+     * Chercher un quiz par son code d'accès (pour les étudiants)
+     */
+    #[Route('/public/quizzes/by-code/{code}', name: 'api_quiz_by_code', methods: ['GET'])]
+    public function findByCode(string $code, EntityManagerInterface $entityManager): JsonResponse
+    {
+        $quiz = $entityManager->getRepository(Quiz::class)->findOneBy([
+            'accessCode' => $code,
+            'isActive' => true
+        ]);
+
+        if (!$quiz) {
+            return new JsonResponse(['error' => 'Quiz non trouvé'], Response::HTTP_NOT_FOUND);
+        }
+
+        return new JsonResponse([
+            'id' => $quiz->getId(),
+            'title' => $quiz->getTitle(),
+            'description' => $quiz->getDescription(),
+            'accessCode' => $quiz->getAccessCode(),
+            'isActive' => $quiz->isActive()
+        ]);
+    }
+
+    /**
      * Soumettre les réponses d'un quiz et calculer le score
      * Cette méthode contient de la logique métier complexe qui ne peut pas être facilement
      * gérée par un State Processor standard
@@ -78,10 +102,40 @@ class ApiQuizController extends AbstractController
         // Persister le score mis à jour
         $entityManager->flush();
 
+        // Préparer les détails des réponses pour le frontend
+        $responseDetails = [];
+        foreach ($answers as $questionId => $answerId) {
+            $question = $entityManager->getRepository('App\Entity\Question')->find($questionId);
+            $userAnswer = $entityManager->getRepository('App\Entity\Answer')->find($answerId);
+
+            if ($question && $userAnswer) {
+                // Trouver la bonne réponse
+                $correctAnswer = $entityManager->getRepository('App\Entity\Answer')
+                    ->findOneBy(['question' => $question, 'isCorrect' => true]);
+
+                $responseDetails[] = [
+                    'questionId' => $questionId,
+                    'questionText' => $question->getText(),
+                    'userAnswer' => [
+                        'id' => $userAnswer->getId(),
+                        'text' => $userAnswer->getText(),
+                        'isCorrect' => $userAnswer->isCorrect()
+                    ],
+                    'correctAnswer' => $correctAnswer ? [
+                        'id' => $correctAnswer->getId(),
+                        'text' => $correctAnswer->getText(),
+                        'isCorrect' => $correctAnswer->isCorrect()
+                    ] : null,
+                    'isCorrect' => $userAnswer->isCorrect()
+                ];
+            }
+        }
+
         return new JsonResponse([
             'score' => $quizAttempt->getScore(),
             'totalQuestions' => $quizAttempt->getTotalQuestions(),
             'percentage' => $quizAttempt->getPercentage(),
+            'responseDetails' => $responseDetails
         ]);
     }
 }

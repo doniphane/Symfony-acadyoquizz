@@ -127,7 +127,6 @@ class QuizAttempt
     #[ORM\ManyToOne(inversedBy: 'quizAttempts')]
     #[ORM\JoinColumn(nullable: false)]
     #[Groups(['quiz_attempt:read', 'quiz_attempt:write'])]
-    #[Assert\NotNull(message: 'Le quiz associé ne peut pas être nul.')]
     private ?Quiz $quiz = null;
 
     #[ORM\ManyToOne(inversedBy: 'quizAttempts')]
@@ -308,7 +307,7 @@ class QuizAttempt
     )]
     public function getPercentage(): float
     {
-        if ($this->totalQuestions === 0) {
+        if ($this->totalQuestions === null || $this->totalQuestions === 0) {
             return 0.0;
         }
 
