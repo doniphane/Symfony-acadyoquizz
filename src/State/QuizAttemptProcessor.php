@@ -11,7 +11,7 @@ use Symfony\Component\HttpFoundation\Exception\BadRequestException;
 
 /**
  * Processor pour la création des tentatives de quiz
- * Remplace la méthode participate du ApiQuizController
+
  */
 class QuizAttemptProcessor implements ProcessorInterface
 {

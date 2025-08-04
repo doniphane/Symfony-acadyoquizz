@@ -18,6 +18,9 @@ use Symfony\Component\Serializer\Annotation\Groups;
 use Symfony\Component\Validator\Constraints as Assert;
 use Symfony\Bridge\Doctrine\Validator\Constraints\UniqueEntity;
 use Lexik\Bundle\JWTAuthenticationBundle\Security\User\JWTUserInterface;
+use App\State\UserRegistrationProcessor;
+use App\State\TokenVerificationProvider;
+use App\State\MeProvider;
 
 #[ORM\Entity(repositoryClass: UserRepository::class)]
 #[ApiResource(
@@ -30,6 +33,31 @@ use Lexik\Bundle\JWTAuthenticationBundle\Security\User\JWTUserInterface;
     ],
     normalizationContext: ['groups' => ['user:read']],
     denormalizationContext: ['groups' => ['user:write']],
+    formats: ['jsonld', 'json']
+)]
+#[ApiResource(
+    uriTemplate: '/register',
+    operations: [
+        new Post(processor: UserRegistrationProcessor::class)
+    ],
+    normalizationContext: ['groups' => ['user:read', 'user:register']],
+    denormalizationContext: ['groups' => ['user:write']],
+    formats: ['jsonld', 'json']
+)]
+#[ApiResource(
+    uriTemplate: '/me',
+    operations: [
+        new Get(provider: MeProvider::class, security: "is_granted('ROLE_USER')")
+    ],
+    normalizationContext: ['groups' => ['user:read']],
+    formats: ['jsonld', 'json']
+)]
+#[ApiResource(
+    uriTemplate: '/verify-token',
+    operations: [
+        new Get(provider: TokenVerificationProvider::class, security: "is_granted('ROLE_USER')")
+    ],
+    normalizationContext: ['groups' => ['user:read']],
     formats: ['jsonld', 'json']
 )]
 #[UniqueEntity(
@@ -93,9 +121,8 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface, JWTUser
     )]
     private ?string $password = null;
 
-    #[ORM\Column(length: 255)]
+    #[ORM\Column(length: 255, nullable: true)]
     #[Groups(['user:read', 'user:write'])]
-    #[Assert\NotBlank(message: 'Le prénom est obligatoire.')]
     #[Assert\Length(
         min: 2,
         max: 255,
@@ -106,15 +133,10 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface, JWTUser
         pattern: '/^[a-zA-ZÀ-ÿ\s\'-]+$/u',
         message: 'Le prénom ne peut contenir que des lettres, espaces, apostrophes et tirets.'
     )]
-    #[Assert\NotRegex(
-        pattern: '/[<>{}"\\\\\[\]]/',
-        message: 'Le prénom contient des caractères non autorisés.'
-    )]
     private ?string $firstName = null;
 
-    #[ORM\Column(length: 255)]
+    #[ORM\Column(length: 255, nullable: true)]
     #[Groups(['user:read', 'user:write'])]
-    #[Assert\NotBlank(message: 'Le nom de famille est obligatoire.')]
     #[Assert\Length(
         min: 2,
         max: 255,
@@ -124,10 +146,6 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface, JWTUser
     #[Assert\Regex(
         pattern: '/^[a-zA-ZÀ-ÿ\s\'-]+$/u',
         message: 'Le nom de famille ne peut contenir que des lettres, espaces, apostrophes et tirets.'
-    )]
-    #[Assert\NotRegex(
-        pattern: '/[<>{}"\\\\\[\]]/',
-        message: 'Le nom de famille contient des caractères non autorisés.'
     )]
     private ?string $lastName = null;
 
@@ -303,6 +321,13 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface, JWTUser
 
         return $this;
     }
+
+    /**
+     * Token JWT temporaire pour l'inscription
+     * Utilisé uniquement pour passer le token depuis le UserRegistrationProcessor
+     */
+    #[Groups(['user:register'])]
+    public ?string $jwtToken = null;
 
     /**
      * Créer un utilisateur à partir du payload JWT

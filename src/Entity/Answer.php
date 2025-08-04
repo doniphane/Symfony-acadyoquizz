@@ -212,9 +212,6 @@ class Answer
         return false;
     }
 
-    /**
-     * Méthode utilitaire pour compter les réponses correctes d'une question
-     */
     public function countCorrectAnswersInQuestion(): int
     {
         if (!$this->question) {

@@ -21,6 +21,9 @@ use App\State\QuizDataPersister;
 use App\State\QuizDataProvider;
 use App\State\QuizUpdateProcessor;
 use App\State\QuizPublicDataProvider;
+use App\State\QuizStatsProvider;
+use App\State\QuizWithQuestionsPersister;
+use App\State\AllQuizzesProvider;
 
 #[ORM\Entity(repositoryClass: QuizRepository::class)]
 #[UniqueEntity(
@@ -31,7 +34,7 @@ use App\State\QuizPublicDataProvider;
     operations: [
         new Get(),
         new GetCollection(),
-        new Post(processor: QuizDataPersister::class),
+        new Post(processor: QuizWithQuestionsPersister::class),
         new Put(
             processor: QuizUpdateProcessor::class,
             denormalizationContext: ['groups' => ['quiz:update']]
@@ -60,6 +63,17 @@ use App\State\QuizPublicDataProvider;
     normalizationContext: ['groups' => ['quiz:read']],
     formats: ['jsonld', 'json']
 )]
+
+
+#[ApiResource(
+    uriTemplate: '/admin/quizzes',
+    operations: [
+        new GetCollection(provider: AllQuizzesProvider::class, security: "is_granted('ROLE_ADMIN')"),
+    ],
+    normalizationContext: ['groups' => ['quiz:read']],
+    formats: ['jsonld', 'json']
+)]
+
 
 class Quiz
 {

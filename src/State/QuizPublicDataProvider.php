@@ -9,7 +9,7 @@ use Doctrine\ORM\EntityManagerInterface;
 
 /**
  * Provider pour les quiz publics (actifs uniquement)
- * Remplace les méthodes list, show et findByCode du ApiQuizController
+
  */
 class QuizPublicDataProvider implements ProviderInterface
 {
@@ -32,9 +32,9 @@ class QuizPublicDataProvider implements ProviderInterface
         }
 
         // Pour les opérations GET sur un quiz par code d'accès
-        if (isset($uriVariables['code'])) {
+        if (isset($uriVariables['accessCode'])) {
             $quiz = $this->entityManager->getRepository(Quiz::class)->findOneBy([
-                'accessCode' => $uriVariables['code'],
+                'accessCode' => $uriVariables['accessCode'],
                 'isActive' => true
             ]);
 

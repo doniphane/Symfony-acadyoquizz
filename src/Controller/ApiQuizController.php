@@ -5,38 +5,48 @@ namespace App\Controller;
 use App\Entity\Quiz;
 use App\Entity\QuizAttempt;
 use App\Repository\QuizAttemptRepository;
+use App\Repository\QuizRepository;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Annotation\Route;
+use Symfony\Component\Serializer\SerializerInterface;
 
-#[Route('/api')]
+#[Route('/api/public/quizzes')]
 class ApiQuizController extends AbstractController
 {
+    public function __construct(
+        private QuizRepository $quizRepository,
+        private SerializerInterface $serializer
+    ) {
+    }
+
     /**
-     * Chercher un quiz par son code d'accès (pour les étudiants)
+     * Récupérer un quiz par son code d'accès
      */
-    #[Route('/public/quizzes/by-code/{code}', name: 'api_quiz_by_code', methods: ['GET'])]
-    public function findByCode(string $code, EntityManagerInterface $entityManager): JsonResponse
+    #[Route('/by-code/{accessCode}', name: 'api_quiz_by_code', methods: ['GET'])]
+    public function getQuizByCode(string $accessCode): JsonResponse
     {
-        $quiz = $entityManager->getRepository(Quiz::class)->findOneBy([
-            'accessCode' => $code,
+        // Rechercher le quiz par code d'accès et vérifier qu'il est actif
+        $quiz = $this->quizRepository->findOneBy([
+            'accessCode' => $accessCode,
             'isActive' => true
         ]);
 
         if (!$quiz) {
-            return new JsonResponse(['error' => 'Quiz non trouvé'], Response::HTTP_NOT_FOUND);
+            return new JsonResponse([
+                'error' => 'Quiz non trouvé ou non actif'
+            ], Response::HTTP_NOT_FOUND);
         }
 
-        return new JsonResponse([
-            'id' => $quiz->getId(),
-            'title' => $quiz->getTitle(),
-            'description' => $quiz->getDescription(),
-            'accessCode' => $quiz->getAccessCode(),
-            'isActive' => $quiz->isActive()
+        // Sérialiser le quiz avec les questions et réponses
+        $data = $this->serializer->serialize($quiz, 'json', [
+            'groups' => ['quiz:read']
         ]);
+
+        return new JsonResponse(json_decode($data, true), Response::HTTP_OK);
     }
 
     /**

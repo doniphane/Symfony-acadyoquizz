@@ -236,11 +236,7 @@ class Question
         return $this;
     }
 
-    // === MÉTHODES UTILITAIRES POUR LA VALIDATION ===
 
-    /**
-     * Vérifier qu'il y a au moins une réponse correcte
-     */
     public function hasCorrectAnswer(): bool
     {
         foreach ($this->answers as $answer) {
