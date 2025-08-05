@@ -8,7 +8,7 @@ use ApiPlatform\Metadata\GetCollection;
 use ApiPlatform\Metadata\Post;
 use ApiPlatform\Metadata\Put;
 use ApiPlatform\Metadata\Delete;
-use App\Repository\UserRepository;
+use App\Repository\UtilisateurRepository;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
@@ -19,10 +19,9 @@ use Symfony\Component\Validator\Constraints as Assert;
 use Symfony\Bridge\Doctrine\Validator\Constraints\UniqueEntity;
 use Lexik\Bundle\JWTAuthenticationBundle\Security\User\JWTUserInterface;
 use App\State\UserRegistrationProcessor;
-use App\State\TokenVerificationProvider;
 use App\State\MeProvider;
 
-#[ORM\Entity(repositoryClass: UserRepository::class)]
+#[ORM\Entity(repositoryClass: UtilisateurRepository::class)]
 #[ApiResource(
     operations: [
         new Get(),
@@ -31,8 +30,8 @@ use App\State\MeProvider;
         new Put(),
         new Delete()
     ],
-    normalizationContext: ['groups' => ['user:read']],
-    denormalizationContext: ['groups' => ['user:write']],
+    normalizationContext: ['groups' => ['utilisateur:read']],
+    denormalizationContext: ['groups' => ['utilisateur:write']],
     formats: ['jsonld', 'json']
 )]
 #[ApiResource(
@@ -40,8 +39,8 @@ use App\State\MeProvider;
     operations: [
         new Post(processor: UserRegistrationProcessor::class)
     ],
-    normalizationContext: ['groups' => ['user:read', 'user:register']],
-    denormalizationContext: ['groups' => ['user:write']],
+    normalizationContext: ['groups' => ['utilisateur:read', 'utilisateur:register']],
+    denormalizationContext: ['groups' => ['utilisateur:register']],
     formats: ['jsonld', 'json']
 )]
 #[ApiResource(
@@ -49,31 +48,23 @@ use App\State\MeProvider;
     operations: [
         new Get(provider: MeProvider::class, security: "is_granted('ROLE_USER')")
     ],
-    normalizationContext: ['groups' => ['user:read']],
-    formats: ['jsonld', 'json']
-)]
-#[ApiResource(
-    uriTemplate: '/verify-token',
-    operations: [
-        new Get(provider: TokenVerificationProvider::class, security: "is_granted('ROLE_USER')")
-    ],
-    normalizationContext: ['groups' => ['user:read']],
+    normalizationContext: ['groups' => ['utilisateur:read']],
     formats: ['jsonld', 'json']
 )]
 #[UniqueEntity(
     fields: ['email'],
     message: 'Cette adresse email est déjà utilisée.'
 )]
-class User implements UserInterface, PasswordAuthenticatedUserInterface, JWTUserInterface
+class Utilisateur implements UserInterface, PasswordAuthenticatedUserInterface, JWTUserInterface
 {
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column]
-    #[Groups(['user:read'])]
+    #[Groups(['utilisateur:read'])]
     private ?int $id = null;
 
     #[ORM\Column(length: 180, unique: true)]
-    #[Groups(['user:read', 'user:write'])]
+    #[Groups(['utilisateur:read', 'utilisateur:write', 'utilisateur:register'])]
     #[Assert\NotBlank(message: 'L\'adresse email est obligatoire.')]
     #[Assert\Email(message: 'L\'adresse email {{ value }} n\'est pas valide.')]
     #[Assert\Length(
@@ -87,7 +78,7 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface, JWTUser
     private ?string $email = null;
 
     #[ORM\Column]
-    #[Groups(['user:read'])]
+    #[Groups(['utilisateur:read'])]
     #[Assert\Type(
         type: 'array',
         message: 'Les rôles doivent être un tableau.'
@@ -104,7 +95,7 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface, JWTUser
      * @var string The hashed password
      */
     #[ORM\Column]
-    #[Groups(['user:write'])]
+    #[Groups(['utilisateur:write', 'utilisateur:register'])]
     #[Assert\NotBlank(message: 'Le mot de passe est obligatoire.')]
     #[Assert\Length(
         min: 6,
@@ -116,51 +107,55 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface, JWTUser
         pattern: '/^(?=.*[a-zA-Z])(?=.*\d)/',
         message: 'Le mot de passe doit contenir au moins une lettre et un chiffre.'
     )]
-    #[Assert\NotCompromisedPassword(
-        message: 'Ce mot de passe a été compromis dans une fuite de données. Veuillez en choisir un autre.'
-    )]
+    // #[Assert\NotCompromisedPassword(
+    //     message: 'Ce mot de passe a été compromis dans une fuite de données. Veuillez en choisir un autre.'
+    // )]
     private ?string $password = null;
 
     #[ORM\Column(length: 255, nullable: true)]
-    #[Groups(['user:read', 'user:write'])]
+    #[Groups(['utilisateur:read', 'utilisateur:write', 'utilisateur:register'])]
     #[Assert\Length(
         min: 2,
         max: 255,
         minMessage: 'Le prénom doit contenir au moins {{ limit }} caractères.',
-        maxMessage: 'Le prénom ne peut pas dépasser {{ limit }} caractères.'
+        maxMessage: 'Le prénom ne peut pas dépasser {{ limit }} caractères.',
+        groups: ['utilisateur:write']
     )]
     #[Assert\Regex(
         pattern: '/^[a-zA-ZÀ-ÿ\s\'-]+$/u',
-        message: 'Le prénom ne peut contenir que des lettres, espaces, apostrophes et tirets.'
+        message: 'Le prénom ne peut contenir que des lettres, espaces, apostrophes et tirets.',
+        groups: ['utilisateur:write']
     )]
     private ?string $firstName = null;
 
     #[ORM\Column(length: 255, nullable: true)]
-    #[Groups(['user:read', 'user:write'])]
+    #[Groups(['utilisateur:read', 'utilisateur:write', 'utilisateur:register'])]
     #[Assert\Length(
         min: 2,
         max: 255,
         minMessage: 'Le nom de famille doit contenir au moins {{ limit }} caractères.',
-        maxMessage: 'Le nom de famille ne peut pas dépasser {{ limit }} caractères.'
+        maxMessage: 'Le nom de famille ne peut pas dépasser {{ limit }} caractères.',
+        groups: ['utilisateur:write']
     )]
     #[Assert\Regex(
         pattern: '/^[a-zA-ZÀ-ÿ\s\'-]+$/u',
-        message: 'Le nom de famille ne peut contenir que des lettres, espaces, apostrophes et tirets.'
+        message: 'Le nom de famille ne peut contenir que des lettres, espaces, apostrophes et tirets.',
+        groups: ['utilisateur:write']
     )]
     private ?string $lastName = null;
 
-    #[ORM\OneToMany(mappedBy: 'user', targetEntity: QuizAttempt::class, orphanRemoval: true)]
-    #[Groups(['user:read'])]
-    private Collection $quizAttempts;
+    #[ORM\OneToMany(mappedBy: 'utilisateur', targetEntity: TentativeQuestionnaire::class, orphanRemoval: true)]
+    #[Groups(['utilisateur:read'])]
+    private Collection $tentativesQuestionnaire;
 
-    #[ORM\OneToMany(mappedBy: 'createdBy', targetEntity: Quiz::class, orphanRemoval: true)]
-    #[Groups(['user:read'])]
-    private Collection $quizzes;
+    #[ORM\OneToMany(mappedBy: 'creePar', targetEntity: Questionnaire::class, orphanRemoval: true)]
+    #[Groups(['utilisateur:read'])]
+    private Collection $questionnaires;
 
     public function __construct()
     {
-        $this->quizAttempts = new ArrayCollection();
-        $this->quizzes = new ArrayCollection();
+        $this->tentativesQuestionnaire = new ArrayCollection();
+        $this->questionnaires = new ArrayCollection();
     }
 
     public function getId(): ?int
@@ -263,29 +258,29 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface, JWTUser
     }
 
     /**
-     * @return Collection<int, QuizAttempt>
+     * @return Collection<int, TentativeQuestionnaire>
      */
-    public function getQuizAttempts(): Collection
+    public function getTentativesQuestionnaire(): Collection
     {
-        return $this->quizAttempts;
+        return $this->tentativesQuestionnaire;
     }
 
-    public function addQuizAttempt(QuizAttempt $quizAttempt): static
+    public function addTentativeQuestionnaire(TentativeQuestionnaire $tentativeQuestionnaire): static
     {
-        if (!$this->quizAttempts->contains($quizAttempt)) {
-            $this->quizAttempts->add($quizAttempt);
-            $quizAttempt->setUser($this);
+        if (!$this->tentativesQuestionnaire->contains($tentativeQuestionnaire)) {
+            $this->tentativesQuestionnaire->add($tentativeQuestionnaire);
+            $tentativeQuestionnaire->setUtilisateur($this);
         }
 
         return $this;
     }
 
-    public function removeQuizAttempt(QuizAttempt $quizAttempt): static
+    public function removeTentativeQuestionnaire(TentativeQuestionnaire $tentativeQuestionnaire): static
     {
-        if ($this->quizAttempts->removeElement($quizAttempt)) {
+        if ($this->tentativesQuestionnaire->removeElement($tentativeQuestionnaire)) {
             // set the owning side to null (unless already changed)
-            if ($quizAttempt->getUser() === $this) {
-                $quizAttempt->setUser(null);
+            if ($tentativeQuestionnaire->getUtilisateur() === $this) {
+                $tentativeQuestionnaire->setUtilisateur(null);
             }
         }
 
@@ -293,29 +288,29 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface, JWTUser
     }
 
     /**
-     * @return Collection<int, Quiz>
+     * @return Collection<int, Questionnaire>
      */
-    public function getQuizzes(): Collection
+    public function getQuestionnaires(): Collection
     {
-        return $this->quizzes;
+        return $this->questionnaires;
     }
 
-    public function addQuiz(Quiz $quiz): static
+    public function addQuestionnaire(Questionnaire $questionnaire): static
     {
-        if (!$this->quizzes->contains($quiz)) {
-            $this->quizzes->add($quiz);
-            $quiz->setCreatedBy($this);
+        if (!$this->questionnaires->contains($questionnaire)) {
+            $this->questionnaires->add($questionnaire);
+            $questionnaire->setCreePar($this);
         }
 
         return $this;
     }
 
-    public function removeQuiz(Quiz $quiz): static
+    public function removeQuestionnaire(Questionnaire $questionnaire): static
     {
-        if ($this->quizzes->removeElement($quiz)) {
+        if ($this->questionnaires->removeElement($questionnaire)) {
             // set the owning side to null (unless already changed)
-            if ($quiz->getCreatedBy() === $this) {
-                $quiz->setCreatedBy(null);
+            if ($questionnaire->getCreePar() === $this) {
+                $questionnaire->setCreePar(null);
             }
         }
 
@@ -326,7 +321,7 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface, JWTUser
      * Token JWT temporaire pour l'inscription
      * Utilisé uniquement pour passer le token depuis le UserRegistrationProcessor
      */
-    #[Groups(['user:register'])]
+    #[Groups(['utilisateur:register'])]
     public ?string $jwtToken = null;
 
     /**
@@ -334,17 +329,17 @@ class User implements UserInterface, PasswordAuthenticatedUserInterface, JWTUser
      */
     public static function createFromPayload($username, array $payload): self
     {
-        $user = new self();
-        $user->setEmail($username);
-        $user->setFirstName($payload['firstName'] ?? 'User');
-        $user->setLastName($payload['lastName'] ?? 'Default');
+        $utilisateur = new self();
+        $utilisateur->setEmail($username);
+        $utilisateur->setFirstName($payload['firstName'] ?? 'User');
+        $utilisateur->setLastName($payload['lastName'] ?? 'Default');
 
         // Validation des rôles du payload
         $roles = $payload['roles'] ?? ['ROLE_USER'];
         $allowedRoles = ['ROLE_USER', 'ROLE_ADMIN', 'ROLE_MODERATOR'];
         $validRoles = array_intersect($roles, $allowedRoles);
-        $user->setRoles($validRoles ?: ['ROLE_USER']);
+        $utilisateur->setRoles($validRoles ?: ['ROLE_USER']);
 
-        return $user;
+        return $utilisateur;
     }
 }

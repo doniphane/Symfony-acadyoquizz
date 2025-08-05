@@ -9,7 +9,7 @@ use ApiPlatform\Metadata\Post;
 use ApiPlatform\Metadata\Put;
 use ApiPlatform\Metadata\Delete;
 use ApiPlatform\Metadata\ApiProperty;
-use App\Repository\QuizRepository;
+use App\Repository\QuestionnaireRepository;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
 use Doctrine\ORM\Mapping as ORM;
@@ -17,74 +17,68 @@ use Symfony\Component\Serializer\Annotation\Groups;
 use Symfony\Component\Serializer\Annotation\SerializedName;
 use Symfony\Component\Validator\Constraints as Assert;
 use Symfony\Bridge\Doctrine\Validator\Constraints\UniqueEntity;
-use App\State\QuizDataPersister;
-use App\State\QuizDataProvider;
-use App\State\QuizUpdateProcessor;
-use App\State\QuizPublicDataProvider;
-use App\State\QuizStatsProvider;
-use App\State\QuizWithQuestionsPersister;
-use App\State\AllQuizzesProvider;
+use App\State\QuestionnaireDataPersister;
+use App\State\QuestionnaireDataProvider;
+use App\State\QuestionnaireUpdateProcessor;
+use App\State\QuestionnairePublicDataProvider;
 
-#[ORM\Entity(repositoryClass: QuizRepository::class)]
+#[ORM\Entity(repositoryClass: QuestionnaireRepository::class)]
 #[UniqueEntity(
-    fields: ['accessCode'],
+    fields: ['codeAcces'],
     message: 'Ce code d\'accès est déjà utilisé.'
 )]
 #[ApiResource(
     operations: [
         new Get(),
         new GetCollection(),
-        new Post(processor: QuizWithQuestionsPersister::class),
+        new Post(processor: QuestionnaireDataPersister::class),
         new Put(
-            processor: QuizUpdateProcessor::class,
-            denormalizationContext: ['groups' => ['quiz:update']]
+            processor: QuestionnaireUpdateProcessor::class,
+            denormalizationContext: ['groups' => ['questionnaire:update']]
         ),
         new Delete(
-            security: "is_granted('ROLE_ADMIN') and object.getCreatedBy() == user"
+            security: "is_granted('ROLE_ADMIN') and object.getCreePar() == user"
         )
     ],
-    normalizationContext: ['groups' => ['quiz:read']],
-    denormalizationContext: ['groups' => ['quiz:write']],
+    normalizationContext: ['groups' => ['questionnaire:read']],
+    denormalizationContext: ['groups' => ['questionnaire:write']],
     formats: ['jsonld', 'json']
 )]
 #[ApiResource(
-    uriTemplate: '/public/quizzes',
+    uriTemplate: '/public/questionnaires',
     operations: [
-        new GetCollection(provider: QuizPublicDataProvider::class),
+        new GetCollection(provider: QuestionnairePublicDataProvider::class),
     ],
-    normalizationContext: ['groups' => ['quiz:read']],
+    normalizationContext: ['groups' => ['questionnaire:read']],
     formats: ['jsonld', 'json']
 )]
 #[ApiResource(
-    uriTemplate: '/public/quizzes/{id}',
+    uriTemplate: '/public/questionnaires/{id}',
     operations: [
-        new Get(provider: QuizPublicDataProvider::class),
+        new Get(provider: QuestionnairePublicDataProvider::class),
     ],
-    normalizationContext: ['groups' => ['quiz:read']],
+    normalizationContext: ['groups' => ['questionnaire:read']],
     formats: ['jsonld', 'json']
 )]
-
-
 #[ApiResource(
-    uriTemplate: '/admin/quizzes',
+    uriTemplate: '/admin/questionnaires',
     operations: [
-        new GetCollection(provider: AllQuizzesProvider::class, security: "is_granted('ROLE_ADMIN')"),
+        new GetCollection(provider: QuestionnaireDataProvider::class, security: "is_granted('ROLE_ADMIN')"),
     ],
-    normalizationContext: ['groups' => ['quiz:read']],
+    normalizationContext: ['groups' => ['questionnaire:read']],
     formats: ['jsonld', 'json']
 )]
-
-
-class Quiz
+class Questionnaire
 {
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column]
-    #[Groups(['quiz:read'])]
+    #[Groups(['questionnaire:read'])]
     private ?int $id = null;
 
     #[ORM\Column(length: 255)]
-    #[Groups(['quiz:read', 'quiz:write', 'quiz:update'])]
+    #[Groups(['questionnaire:read', 'questionnaire:write', 'questionnaire:update'])]
+    #[SerializedName('title')]
     #[Assert\Length(
         min: 3,
         max: 255,
@@ -95,10 +89,10 @@ class Quiz
         pattern: '/^[a-zA-Z0-9\sÀ-ÿ\-_\.\!\?]+$/u',
         message: 'Le titre contient des caractères non autorisés.'
     )]
-    private ?string $title = null;
+    private ?string $titre = null;
 
     #[ORM\Column(type: 'text', nullable: true)]
-    #[Groups(['quiz:read', 'quiz:write', 'quiz:update'])]
+    #[Groups(['questionnaire:read', 'questionnaire:write', 'questionnaire:update'])]
     #[Assert\Length(
         max: 2000,
         maxMessage: 'La description ne peut pas dépasser {{ limit }} caractères.'
@@ -110,7 +104,8 @@ class Quiz
     private ?string $description = null;
 
     #[ORM\Column(length: 10, unique: true)]
-    #[Groups(['quiz:read'])]
+    #[Groups(['questionnaire:read'])]
+    #[SerializedName('accessCode')]
     #[Assert\NotBlank(message: 'Le code d\'accès ne peut pas être vide.')]
     #[Assert\Length(
         min: 6,
@@ -121,26 +116,26 @@ class Quiz
         pattern: '/^[A-Z0-9]+$/',
         message: 'Le code d\'accès ne peut contenir que des lettres majuscules et des chiffres.'
     )]
-    private ?string $accessCode = null;
+    private ?string $codeAcces = null;
 
     #[ORM\Column]
-    #[Groups(['quiz:read', 'quiz:write', 'quiz:update'])]
+    #[Groups(['questionnaire:read', 'questionnaire:write', 'questionnaire:update'])]
     #[Assert\Type(
         type: 'bool',
         message: 'La valeur doit être un booléen.'
     )]
-    private ?bool $isActive = true;
+    private ?bool $estActif = true;
 
     #[ORM\Column]
-    #[Groups(['quiz:read', 'quiz:write', 'quiz:update'])]
+    #[Groups(['questionnaire:read', 'questionnaire:write', 'questionnaire:update'])]
     #[Assert\Type(
         type: 'bool',
         message: 'La valeur doit être un booléen.'
     )]
-    private ?bool $isStarted = false;
+    private ?bool $estDemarre = false;
 
     #[ORM\Column]
-    #[Groups(['quiz:read', 'quiz:write', 'quiz:update'])]
+    #[Groups(['questionnaire:read', 'questionnaire:write', 'questionnaire:update'])]
     #[Assert\Type(
         type: 'integer',
         message: 'Le score de passage doit être un nombre entier.'
@@ -150,49 +145,50 @@ class Quiz
         max: 100,
         notInRangeMessage: 'Le score de passage doit être entre {{ min }}% et {{ max }}%.'
     )]
-    private ?int $passingScore = 70;
+    private ?int $scorePassage = 70;
 
     #[ORM\Column]
-    #[Groups(['quiz:read', 'quiz:write'])]
+    #[Groups(['questionnaire:read', 'questionnaire:write'])]
+    #[SerializedName('createdAt')]
     #[Assert\NotNull(message: 'La date de création ne peut pas être nulle.')]
     #[Assert\Type(
         type: \DateTimeImmutable::class,
         message: 'La date de création doit être une date valide.'
     )]
-    private ?\DateTimeImmutable $createdAt = null;
+    private ?\DateTimeImmutable $dateCreation = null;
 
-    #[ORM\ManyToOne(inversedBy: 'quizzes')]
+    #[ORM\ManyToOne(inversedBy: 'questionnaires')]
     #[ORM\JoinColumn(nullable: false)]
-    #[Groups(['quiz:read'])]
-    private ?User $createdBy = null;
+    #[Groups(['questionnaire:read'])]
+    private ?Utilisateur $creePar = null;
 
-    #[ORM\OneToMany(mappedBy: 'quiz', targetEntity: Question::class, orphanRemoval: true)]
-    #[Groups(['quiz:read'])]
+    #[ORM\OneToMany(mappedBy: 'questionnaire', targetEntity: Question::class, orphanRemoval: true)]
+    #[Groups(['questionnaire:read'])]
     #[ApiProperty(readableLink: true, writableLink: false)]
     #[Assert\Valid]
     private Collection $questions;
 
-    #[ORM\OneToMany(mappedBy: 'quiz', targetEntity: QuizAttempt::class, orphanRemoval: true)]
-    #[Groups(['quiz:read'])]
+    #[ORM\OneToMany(mappedBy: 'questionnaire', targetEntity: TentativeQuestionnaire::class, orphanRemoval: true)]
+    #[Groups(['questionnaire:read'])]
     #[ApiProperty(readableLink: true, writableLink: false)]
     #[Assert\Valid]
-    private Collection $quizAttempts;
+    private Collection $tentativesQuestionnaire;
 
     public function __construct()
     {
         $this->questions = new ArrayCollection();
-        $this->quizAttempts = new ArrayCollection();
-        $this->createdAt = new \DateTimeImmutable();
-        $this->accessCode = $this->generateAccessCode();
+        $this->tentativesQuestionnaire = new ArrayCollection();
+        $this->dateCreation = new \DateTimeImmutable();
+        $this->codeAcces = $this->genererCodeAcces();
     }
 
     /**
-     * Génère un nouveau code d'accès pour ce quiz
+     * Génère un nouveau code d'accès pour ce questionnaire
      * Utilisé si le code actuel entre en conflit
      */
-    public function regenerateAccessCode(): void
+    public function regenererCodeAcces(): void
     {
-        $this->accessCode = $this->generateAccessCode();
+        $this->codeAcces = $this->genererCodeAcces();
     }
 
     public function getId(): ?int
@@ -200,14 +196,14 @@ class Quiz
         return $this->id;
     }
 
-    public function getTitle(): ?string
+    public function getTitre(): ?string
     {
-        return $this->title;
+        return $this->titre;
     }
 
-    public function setTitle(string $title): static
+    public function setTitre(string $titre): static
     {
-        $this->title = trim($title);
+        $this->titre = trim($titre);
 
         return $this;
     }
@@ -224,87 +220,87 @@ class Quiz
         return $this;
     }
 
-    public function getAccessCode(): ?string
+    public function getCodeAcces(): ?string
     {
-        return $this->accessCode;
+        return $this->codeAcces;
     }
 
-    public function setAccessCode(string $accessCode): static
+    public function setCodeAcces(string $codeAcces): static
     {
-        $this->accessCode = strtoupper(trim($accessCode));
+        $this->codeAcces = strtoupper(trim($codeAcces));
 
         return $this;
     }
 
     /**
-     * Getter pour uniqueCode (alias de accessCode pour compatibilité frontend)
+     * Getter pour uniqueCode (alias de codeAcces pour compatibilité frontend)
      */
-    #[Groups(['quiz:read'])]
+    #[Groups(['questionnaire:read'])]
     public function getUniqueCode(): ?string
     {
-        return $this->accessCode;
+        return $this->codeAcces;
     }
 
-    #[Groups(['quiz:read'])]
+    #[Groups(['questionnaire:read'])]
     #[SerializedName('isActive')]
     public function isActive(): ?bool
     {
-        return $this->isActive;
+        return $this->estActif;
     }
 
-    public function setIsActive(bool $isActive): static
+    public function setEstActif(bool $estActif): static
     {
-        $this->isActive = $isActive;
+        $this->estActif = $estActif;
 
         return $this;
     }
 
-    #[Groups(['quiz:read'])]
+    #[Groups(['questionnaire:read'])]
     #[SerializedName('isStarted')]
     public function isStarted(): ?bool
     {
-        return $this->isStarted;
+        return $this->estDemarre;
     }
 
-    public function setIsStarted(bool $isStarted): static
+    public function setEstDemarre(bool $estDemarre): static
     {
-        $this->isStarted = $isStarted;
+        $this->estDemarre = $estDemarre;
 
         return $this;
     }
 
-    public function getPassingScore(): ?int
+    public function getScorePassage(): ?int
     {
-        return $this->passingScore;
+        return $this->scorePassage;
     }
 
-    public function setPassingScore(int $passingScore): static
+    public function setScorePassage(int $scorePassage): static
     {
-        $this->passingScore = max(0, min(100, $passingScore));
+        $this->scorePassage = max(0, min(100, $scorePassage));
 
         return $this;
     }
 
-    public function getCreatedAt(): ?\DateTimeImmutable
+    public function getDateCreation(): ?\DateTimeImmutable
     {
-        return $this->createdAt;
+        return $this->dateCreation;
     }
 
-    public function setCreatedAt(\DateTimeImmutable $createdAt): static
+    public function setDateCreation(\DateTimeImmutable $dateCreation): static
     {
-        $this->createdAt = $createdAt;
+        $this->dateCreation = $dateCreation;
 
         return $this;
     }
 
-    public function getCreatedBy(): ?User
+    public function getCreePar(): ?Utilisateur
     {
-        return $this->createdBy;
+        return $this->creePar;
     }
 
-    public function setCreatedBy(?User $createdBy): static
+    public function setCreePar(?Utilisateur $creePar): static
     {
-        $this->createdBy = $createdBy;
+        $this->creePar = $creePar;
 
         return $this;
     }
@@ -321,7 +317,7 @@ class Quiz
     {
         if (!$this->questions->contains($question)) {
             $this->questions->add($question);
-            $question->setQuiz($this);
+            $question->setQuestionnaire($this);
         }
 
         return $this;
@@ -331,8 +327,8 @@ class Quiz
     {
         if ($this->questions->removeElement($question)) {
             // set the owning side to null (unless already changed)
-            if ($question->getQuiz() === $this) {
-                $question->setQuiz(null);
+            if ($question->getQuestionnaire() === $this) {
+                $question->setQuestionnaire(null);
             }
         }
 
@@ -340,36 +336,36 @@ class Quiz
     }
 
     /**
-     * @return Collection<int, QuizAttempt>
+     * @return Collection<int, TentativeQuestionnaire>
      */
-    public function getQuizAttempts(): Collection
+    public function getTentativesQuestionnaire(): Collection
     {
-        return $this->quizAttempts;
+        return $this->tentativesQuestionnaire;
     }
 
-    public function addQuizAttempt(QuizAttempt $quizAttempt): static
+    public function addTentativeQuestionnaire(TentativeQuestionnaire $tentativeQuestionnaire): static
     {
-        if (!$this->quizAttempts->contains($quizAttempt)) {
-            $this->quizAttempts->add($quizAttempt);
-            $quizAttempt->setQuiz($this);
+        if (!$this->tentativesQuestionnaire->contains($tentativeQuestionnaire)) {
+            $this->tentativesQuestionnaire->add($tentativeQuestionnaire);
+            $tentativeQuestionnaire->setQuestionnaire($this);
         }
 
         return $this;
     }
 
-    public function removeQuizAttempt(QuizAttempt $quizAttempt): static
+    public function removeTentativeQuestionnaire(TentativeQuestionnaire $tentativeQuestionnaire): static
     {
-        if ($this->quizAttempts->removeElement($quizAttempt)) {
+        if ($this->tentativesQuestionnaire->removeElement($tentativeQuestionnaire)) {
             // set the owning side to null (unless already changed)
-            if ($quizAttempt->getQuiz() === $this) {
-                $quizAttempt->setQuiz(null);
+            if ($tentativeQuestionnaire->getQuestionnaire() === $this) {
+                $tentativeQuestionnaire->setQuestionnaire(null);
             }
         }
 
         return $this;
     }
 
-    private function generateAccessCode(): string
+    private function genererCodeAcces(): string
     {
         // Génère un code d'accès de 6 caractères aléatoires
 

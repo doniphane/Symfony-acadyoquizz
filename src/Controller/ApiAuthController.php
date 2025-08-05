@@ -2,7 +2,7 @@
 
 namespace App\Controller;
 
-use App\Entity\User;
+use App\Entity\Utilisateur;
 use App\Service\JwtCookieService;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -55,6 +55,8 @@ class ApiAuthController extends AbstractController
 
         return $response;
     }
+
+
 
 
 }

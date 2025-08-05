@@ -2,9 +2,9 @@
 
 namespace App\Controller;
 
-use App\Entity\Quiz;
+use App\Entity\Questionnaire;
 use App\Entity\Question;
-use App\Entity\Answer;
+use App\Entity\Reponse;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -24,16 +24,16 @@ class ApiQuestionController extends AbstractController
         int $id,
         EntityManagerInterface $entityManager
     ): JsonResponse {
-        // Récupérer le quiz par son ID
-        $quiz = $entityManager->getRepository(Quiz::class)->find($id);
+        // Récupérer le questionnaire par son ID
+        $questionnaire = $entityManager->getRepository(Questionnaire::class)->find($id);
 
-        if (!$quiz) {
-            return new JsonResponse(['error' => 'Quiz non trouvé'], Response::HTTP_NOT_FOUND);
+        if (!$questionnaire) {
+            return new JsonResponse(['error' => 'Questionnaire non trouvé'], Response::HTTP_NOT_FOUND);
         }
 
-        // Vérifier que l'utilisateur est propriétaire du quiz
-        if ($quiz->getCreatedBy() !== $this->getUser()) {
-            return new JsonResponse(['error' => 'Accès non autorisé - vous n\'êtes pas le propriétaire de ce quiz'], Response::HTTP_FORBIDDEN);
+        // Vérifier que l'utilisateur est propriétaire du questionnaire
+        if ($questionnaire->getCreePar() !== $this->getUser()) {
+            return new JsonResponse(['error' => 'Accès non autorisé - vous n\'êtes pas le propriétaire de ce questionnaire'], Response::HTTP_FORBIDDEN);
         }
 
         $data = json_decode($request->getContent(), true);
@@ -64,21 +64,21 @@ class ApiQuestionController extends AbstractController
         try {
             // Créer la question
             $question = new Question();
-            $question->setText($data['text']);
-            $question->setQuiz($quiz);
-            $question->setOrderNumber(count($quiz->getQuestions()) + 1);
+            $question->setTexte($data['text']);
+            $question->setQuestionnaire($questionnaire);
+            $question->setNumeroOrdre(count($questionnaire->getQuestions()) + 1);
 
             $entityManager->persist($question);
 
             // Créer les réponses
             foreach ($data['answers'] as $index => $answerData) {
-                $answer = new Answer();
-                $answer->setText($answerData['text']);
-                $answer->setIsCorrect($answerData['correct'] ?? false);
-                $answer->setQuestion($question);
-                $answer->setOrderNumber($index + 1);
+                $reponse = new Reponse();
+                $reponse->setTexte($answerData['text']);
+                $reponse->setEstCorrecte($answerData['correct'] ?? false);
+                $reponse->setQuestion($question);
+                $reponse->setNumeroOrdre($index + 1);
 
-                $entityManager->persist($answer);
+                $entityManager->persist($reponse);
             }
 
             $entityManager->flush();
@@ -88,14 +88,14 @@ class ApiQuestionController extends AbstractController
                 'message' => 'Question ajoutée avec succès',
                 'question' => [
                     'id' => $question->getId(),
-                    'text' => $question->getText(),
-                    'orderNumber' => $question->getOrderNumber(),
-                    'answers' => $question->getAnswers()->map(function ($answer) {
+                    'text' => $question->getTexte(),
+                    'orderNumber' => $question->getNumeroOrdre(),
+                    'answers' => $question->getReponses()->map(function ($reponse) {
                         return [
-                            'id' => $answer->getId(),
-                            'text' => $answer->getText(),
-                            'correct' => $answer->isCorrect(),
-                            'orderNumber' => $answer->getOrderNumber()
+                            'id' => $reponse->getId(),
+                            'text' => $reponse->getTexte(),
+                            'correct' => $reponse->isCorrect(),
+                            'orderNumber' => $reponse->getNumeroOrdre()
                         ];
                     })->toArray()
                 ]

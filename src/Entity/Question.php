@@ -10,6 +10,7 @@ use ApiPlatform\Metadata\Put;
 use ApiPlatform\Metadata\Delete;
 use ApiPlatform\Metadata\ApiProperty;
 use App\Repository\QuestionRepository;
+use App\State\QuestionDataPersister;
 use App\Validator\HasCorrectAnswer;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
@@ -22,7 +23,7 @@ use Symfony\Component\Validator\Constraints as Assert;
     operations: [
         new Get(),
         new GetCollection(),
-        new Post(),
+        new Post(processor: QuestionDataPersister::class),
         new Put(),
         new Delete()
     ],
@@ -34,11 +35,11 @@ class Question
     #[ORM\Id]
     #[ORM\GeneratedValue]
     #[ORM\Column]
-    #[Groups(['question:read', 'quiz:read'])]
+    #[Groups(['question:read', 'questionnaire:read'])]
     private ?int $id = null;
 
     #[ORM\Column(type: 'text')]
-    #[Groups(['question:read', 'question:write', 'quiz:read'])]
+    #[Groups(['question:read', 'question:write', 'questionnaire:read'])]
     #[Assert\NotBlank(message: 'Le texte de la question est obligatoire.')]
     #[Assert\Length(
         min: 5,
@@ -46,22 +47,22 @@ class Question
         minMessage: 'La question doit contenir au moins {{ limit }} caractères.',
         maxMessage: 'La question ne peut pas dépasser {{ limit }} caractères.'
     )]
-    #[Assert\NotRegex(
-        pattern: '/[<>{}"\\\\\[\]`]/',
+    #[Assert\Regex(
+        pattern: '/^[^<>{}"\\\\\[\]`]*$/',
         message: 'La question contient des caractères non autorisés.'
     )]
-    #[Assert\NotRegex(
-        pattern: '/(javascript:|data:|vbscript:|onload=|onerror=|onclick=|onmouseover=)/i',
+    #[Assert\Regex(
+        pattern: '/^(?!.*(javascript:|data:|vbscript:|onload=|onerror=|onclick=|onmouseover=)).*$/i',
         message: 'La question contient du contenu potentiellement dangereux.'
     )]
     #[Assert\Regex(
         pattern: '/^.+\?$/',
         message: 'Une question doit se terminer par un point d\'interrogation.'
     )]
-    private ?string $text = null;
+    private ?string $texte = null;
 
     #[ORM\Column]
-    #[Groups(['question:read', 'question:write', 'quiz:read'])]
+    #[Groups(['question:read', 'question:write', 'questionnaire:read'])]
     #[Assert\NotNull(message: 'Le numéro d\'ordre est obligatoire.')]
     #[Assert\Type(
         type: 'integer',
@@ -75,33 +76,26 @@ class Question
         max: 100,
         notInRangeMessage: 'Le numéro d\'ordre doit être entre {{ min }} et {{ max }}.'
     )]
-    private ?int $orderNumber = null;
+    private ?int $numeroOrdre = null;
 
     #[ORM\ManyToOne(inversedBy: 'questions')]
     #[ORM\JoinColumn(nullable: false)]
     #[Groups(['question:read', 'question:write'])]
-    #[Assert\NotNull(message: 'Le quiz associé est obligatoire.')]
-    private ?Quiz $quiz = null;
+    #[Assert\NotNull(message: 'Le questionnaire associé est obligatoire.')]
+    private ?Questionnaire $questionnaire = null;
 
-    #[ORM\OneToMany(mappedBy: 'question', targetEntity: Answer::class, orphanRemoval: true)]
-    #[Groups(['question:read', 'quiz:read'])]
+    #[ORM\OneToMany(mappedBy: 'question', targetEntity: Reponse::class, orphanRemoval: true)]
+    #[Groups(['question:read', 'questionnaire:read'])]
     #[ApiProperty(readableLink: true, writableLink: false)]
-    #[Assert\Count(
-        min: 2,
-        max: 10,
-        minMessage: 'Une question doit avoir au moins {{ limit }} réponses.',
-        maxMessage: 'Une question ne peut pas avoir plus de {{ limit }} réponses.'
-    )]
-    #[Assert\Valid]
-    private Collection $answers;
+    private Collection $reponses;
 
-    #[ORM\OneToMany(mappedBy: 'question', targetEntity: UserAnswer::class, orphanRemoval: true)]
-    private Collection $userAnswers;
+    #[ORM\OneToMany(mappedBy: 'question', targetEntity: ReponseUtilisateur::class, orphanRemoval: true)]
+    private Collection $reponsesUtilisateur;
 
     public function __construct()
     {
-        $this->answers = new ArrayCollection();
-        $this->userAnswers = new ArrayCollection();
+        $this->reponses = new ArrayCollection();
+        $this->reponsesUtilisateur = new ArrayCollection();
     }
 
     public function getId(): ?int
@@ -109,97 +103,82 @@ class Question
         return $this->id;
     }
 
-    public function getText(): ?string
+    public function getTexte(): ?string
     {
-        return $this->text;
+        return $this->texte;
     }
 
-    public function setText(string $text): static
+    public function setTexte(string $texte): static
     {
         // Nettoyer et sécuriser le texte
-        $cleanText = trim($text);
+        $cleanTexte = trim($texte);
 
         // Supprimer les caractères de contrôle dangereux
-        $cleanText = preg_replace('/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/', '', $cleanText);
+        $cleanTexte = preg_replace('/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/', '', $cleanTexte);
 
         // Encoder les entités HTML pour éviter les injections XSS
-        $cleanText = htmlspecialchars($cleanText, ENT_QUOTES | ENT_HTML5, 'UTF-8');
+        $cleanTexte = htmlspecialchars($cleanTexte, ENT_QUOTES | ENT_HTML5, 'UTF-8');
 
-        // S'assurer que la question se termine par un point d'interrogation
-        if (!empty($cleanText) && !str_ends_with($cleanText, '?')) {
-            $cleanText .= ' ?';
-        }
-
-        $this->text = $cleanText;
+        $this->texte = $cleanTexte;
 
         return $this;
     }
 
-    public function getOrderNumber(): ?int
+    public function getNumeroOrdre(): ?int
     {
-        return $this->orderNumber;
+        return $this->numeroOrdre;
     }
 
-    public function setOrderNumber(int $orderNumber): static
+    public function setNumeroOrdre(int $numeroOrdre): static
     {
         // Valider et sécuriser le numéro d'ordre
-        if ($orderNumber < 1) {
-            $orderNumber = 1;
-        } elseif ($orderNumber > 100) {
-            $orderNumber = 100;
+        if ($numeroOrdre < 1) {
+            $numeroOrdre = 1;
+        } elseif ($numeroOrdre > 100) {
+            $numeroOrdre = 100;
         }
 
-        $this->orderNumber = $orderNumber;
+        $this->numeroOrdre = $numeroOrdre;
 
         return $this;
     }
 
-    public function getQuiz(): ?Quiz
+    public function getQuestionnaire(): ?Questionnaire
     {
-        return $this->quiz;
+        return $this->questionnaire;
     }
 
-    public function setQuiz(?Quiz $quiz): static
+    public function setQuestionnaire(?Questionnaire $questionnaire): static
     {
-        $this->quiz = $quiz;
+        $this->questionnaire = $questionnaire;
 
         return $this;
     }
 
     /**
-     * @return Collection<int, Answer>
+     * @return Collection<int, Reponse>
      */
-    public function getAnswers(): Collection
+    public function getReponses(): Collection
     {
-        return $this->answers;
+        return $this->reponses;
     }
 
-    public function addAnswer(Answer $answer): static
+    public function addReponse(Reponse $reponse): static
     {
-        if (!$this->answers->contains($answer)) {
-            // Vérifier qu'on ne dépasse pas la limite de réponses
-            if ($this->answers->count() >= 10) {
-                throw new \InvalidArgumentException('Une question ne peut pas avoir plus de 10 réponses.');
-            }
-
-            $this->answers->add($answer);
-            $answer->setQuestion($this);
+        if (!$this->reponses->contains($reponse)) {
+            $this->reponses->add($reponse);
+            $reponse->setQuestion($this);
         }
 
         return $this;
     }
 
-    public function removeAnswer(Answer $answer): static
+    public function removeReponse(Reponse $reponse): static
     {
-        if ($this->answers->removeElement($answer)) {
-            // Vérifier qu'on garde au moins 2 réponses
-            if ($this->answers->count() < 2) {
-                throw new \InvalidArgumentException('Une question doit avoir au moins 2 réponses.');
-            }
-
+        if ($this->reponses->removeElement($reponse)) {
             // set the owning side to null (unless already changed)
-            if ($answer->getQuestion() === $this) {
-                $answer->setQuestion(null);
+            if ($reponse->getQuestion() === $this) {
+                $reponse->setQuestion(null);
             }
         }
 
@@ -207,70 +186,74 @@ class Question
     }
 
     /**
-     * @return Collection<int, UserAnswer>
+     * @return Collection<int, ReponseUtilisateur>
      */
-    public function getUserAnswers(): Collection
+    public function getReponsesUtilisateur(): Collection
     {
-        return $this->userAnswers;
+        return $this->reponsesUtilisateur;
     }
 
-    public function addUserAnswer(UserAnswer $userAnswer): static
+    public function addReponseUtilisateur(ReponseUtilisateur $reponseUtilisateur): static
     {
-        if (!$this->userAnswers->contains($userAnswer)) {
-            $this->userAnswers->add($userAnswer);
-            $userAnswer->setQuestion($this);
+        if (!$this->reponsesUtilisateur->contains($reponseUtilisateur)) {
+            $this->reponsesUtilisateur->add($reponseUtilisateur);
+            $reponseUtilisateur->setQuestion($this);
         }
 
         return $this;
     }
 
-    public function removeUserAnswer(UserAnswer $userAnswer): static
+    public function removeReponseUtilisateur(ReponseUtilisateur $reponseUtilisateur): static
     {
-        if ($this->userAnswers->removeElement($userAnswer)) {
+        if ($this->reponsesUtilisateur->removeElement($reponseUtilisateur)) {
             // set the owning side to null (unless already changed)
-            if ($userAnswer->getQuestion() === $this) {
-                $userAnswer->setQuestion(null);
+            if ($reponseUtilisateur->getQuestion() === $this) {
+                $reponseUtilisateur->setQuestion(null);
             }
         }
 
         return $this;
     }
 
-
+    /**
+     * Vérifie si la question a au moins une réponse correcte
+     */
     public function hasCorrectAnswer(): bool
     {
-        foreach ($this->answers as $answer) {
-            if ($answer->isCorrect()) {
+        foreach ($this->reponses as $reponse) {
+            if ($reponse->isCorrect()) {
                 return true;
             }
         }
+
         return false;
     }
 
     /**
-     * Compter le nombre de réponses correctes
+     * Compte le nombre de réponses correctes
      */
     public function getCorrectAnswersCount(): int
     {
         $count = 0;
-        foreach ($this->answers as $answer) {
-            if ($answer->isCorrect()) {
+        foreach ($this->reponses as $reponse) {
+            if ($reponse->isCorrect()) {
                 $count++;
             }
         }
+
         return $count;
     }
 
     /**
-     * Compter le nombre total de réponses
+     * Compte le nombre total de réponses
      */
     public function getAnswersCount(): int
     {
-        return $this->answers->count();
+        return $this->reponses->count();
     }
 
     /**
-     * Vérifier que la question est valide (au moins 2 réponses, au moins 1 correcte)
+     * Vérifie si la question est valide (a au moins 2 réponses et au moins une correcte)
      */
     public function isValid(): bool
     {
@@ -278,36 +261,43 @@ class Question
     }
 
     /**
-     * Obtenir toutes les réponses correctes
+     * Récupère toutes les réponses correctes
      */
     public function getCorrectAnswers(): array
     {
         $correctAnswers = [];
-        foreach ($this->answers as $answer) {
-            if ($answer->isCorrect()) {
-                $correctAnswers[] = $answer;
+        foreach ($this->reponses as $reponse) {
+            if ($reponse->isCorrect()) {
+                $correctAnswers[] = $reponse;
             }
         }
+
         return $correctAnswers;
     }
 
     /**
-     * Obtenir les réponses triées par ordre
+     * Récupère les réponses ordonnées par numéro d'ordre
      */
     public function getAnswersOrderedByNumber(): array
     {
-        $answers = $this->answers->toArray();
-        usort($answers, function ($a, $b) {
-            return $a->getOrderNumber() <=> $b->getOrderNumber();
+        $reponses = $this->reponses->toArray();
+        usort($reponses, function ($a, $b) {
+            return $a->getNumeroOrdre() <=> $b->getNumeroOrdre();
         });
-        return $answers;
+
+        return $reponses;
     }
 
+    /**
+     * Réordonne automatiquement les réponses par numéro d'ordre
+     */
     public function reorderAnswers(): void
     {
-        $answers = $this->getAnswersOrderedByNumber();
-        foreach ($answers as $index => $answer) {
-            $answer->setOrderNumber($index + 1);
+        $reponses = $this->getAnswersOrderedByNumber();
+        $order = 1;
+
+        foreach ($reponses as $reponse) {
+            $reponse->setNumeroOrdre($order++);
         }
     }
 }

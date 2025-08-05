@@ -1,0 +1,89 @@
+# MÉMO - ROUTES DE L'APPLICATION ACADYQUIZZ
+
+## ROUTES API PLATFORM (Générées automatiquement)
+
+### 1. ENTITÉ UTILISATEUR (User → Utilisateur)
+- GET /api/utilisateurs - Liste tous les utilisateurs
+- GET /api/utilisateurs/{id} - Récupère un utilisateur spécifique
+- POST /api/utilisateurs - Crée un nouvel utilisateur
+- PUT /api/utilisateurs/{id} - Met à jour un utilisateur
+- DELETE /api/utilisateurs/{id} - Supprime un utilisateur
+
+### 2. ENTITÉ QUESTIONNAIRE (Quiz → Questionnaire)
+- GET /api/questionnaires - Liste tous les questionnaires
+- GET /api/questionnaires/{id} - Récupère un questionnaire spécifique
+- POST /api/questionnaires - Crée un nouveau questionnaire
+- PUT /api/questionnaires/{id} - Met à jour un questionnaire
+- DELETE /api/questionnaires/{id} - Supprime un questionnaire
+
+### 3. ENTITÉ QUESTION (Question → Question)
+- GET /api/questions - Liste toutes les questions
+- GET /api/questions/{id} - Récupère une question spécifique
+- POST /api/questions - Crée une nouvelle question
+- PUT /api/questions/{id} - Met à jour une question
+- DELETE /api/questions/{id} - Supprime une question
+
+### 4. ENTITÉ REPONSE (Answer → Reponse)
+- GET /api/reponses - Liste toutes les réponses
+- GET /api/reponses/{id} - Récupère une réponse spécifique
+- POST /api/reponses - Crée une nouvelle réponse
+- PUT /api/reponses/{id} - Met à jour une réponse
+- DELETE /api/reponses/{id} - Supprime une réponse
+
+### 5. ENTITÉ TENTATIVE_QUESTIONNAIRE (QuizAttempt → TentativeQuestionnaire)
+- GET /api/tentatives_questionnaire - Liste toutes les tentatives
+- GET /api/tentatives_questionnaire/{id} - Récupère une tentative spécifique
+- POST /api/tentatives_questionnaire - Crée une nouvelle tentative
+- PUT /api/tentatives_questionnaire/{id} - Met à jour une tentative
+- DELETE /api/tentatives_questionnaire/{id} - Supprime une tentative
+
+### 6. ENTITÉ REPONSE_UTILISATEUR (UserAnswer → ReponseUtilisateur)
+- GET /api/reponses_utilisateur - Liste toutes les réponses utilisateur
+- GET /api/reponses_utilisateur/{id} - Récupère une réponse utilisateur spécifique
+- POST /api/reponses_utilisateur - Crée une nouvelle réponse utilisateur
+- PUT /api/reponses_utilisateur/{id} - Met à jour une réponse utilisateur
+- DELETE /api/reponses_utilisateur/{id} - Supprime une réponse utilisateur
+
+## ROUTES PERSONNALISÉES (Contrôleurs)
+
+### 1. API AUTHENTIFICATION CONTROLLER
+- POST /api/login_check - Authentification JWT
+
+### 2. API QUESTIONNAIRE CONTROLLER
+- GET /api/public/questionnaires/{id} - Récupère un questionnaire public par ID
+- POST /api/public/questionnaires/{id}/submit - Soumet les réponses d'un questionnaire
+- GET /api/public/questionnaires/code/{code} - Récupère un questionnaire par code d'accès
+
+### 3. API UTILISATEUR CONTROLLER
+- GET /api/user/my-attempts - Récupère les tentatives de l'utilisateur connecté
+
+## ROUTES SPÉCIALES API PLATFORM
+
+### 1. PARTICIPATION AU QUESTIONNAIRE
+- POST /api/questionnaires/{id}/participate - Crée une tentative de participation (avec processor)
+
+### 2. FOURNISSEURS DE DONNÉES PERSONNALISÉS
+- GET /api/me - Informations de l'utilisateur connecté (MeProvider)
+- GET /api/all-questionnaires - Tous les questionnaires (AllQuestionnairesProvider)
+- GET /api/token-verification - Vérification du token (TokenVerificationProvider)
+
+## NOTES IMPORTANTES
+
+### Authentification
+- Toutes les routes API Platform nécessitent une authentification JWT
+- Les routes publiques (/api/public/*) sont accessibles sans authentification
+- Les routes utilisateur (/api/user/*) nécessitent une authentification
+
+### Processeurs (Processors)
+- TentativeQuestionnaireProcessor : Gère la création de tentatives avec utilisateur associé
+- QuestionnaireDataPersister : Gère la persistance des données de questionnaire
+- QuestionnaireUpdateProcessor : Gère les mises à jour de questionnaires
+- QuestionnaireAvecQuestionsPersister : Gère la persistance avec questions
+
+### Fournisseurs (Providers)
+- QuestionnaireDataProvider : Fournit les données de questionnaire
+- QuestionnairePublicDataProvider : Fournit les données publiques de questionnaire
+- MeProvider : Fournit les données de l'utilisateur connecté
+- AllQuestionnairesProvider : Fournit tous les questionnaires
+- TokenVerificationProvider : Vérifie les tokens JWT
+

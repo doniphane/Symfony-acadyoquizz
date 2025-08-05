@@ -50,7 +50,7 @@ class JwtCookieService
         );
     }
 
-    /**
+        /**
      * Supprime le cookie d'authentification
      * 
      * @return Cookie Le cookie à supprimer
