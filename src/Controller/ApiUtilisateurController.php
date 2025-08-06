@@ -198,4 +198,29 @@ class ApiUtilisateurController extends AbstractController
             'questionnaires' => array_values($questionnairesUniques)
         ]);
     }
+
+    /**
+     * Retourne les informations de l'utilisateur connecté
+     */
+    #[Route('/me', name: 'api_utilisateur_me', methods: ['GET'])]
+    public function getCurrentUser(): JsonResponse
+    {
+        $utilisateur = $this->getUser();
+        if (!$utilisateur) {
+            return new JsonResponse(['error' => 'Utilisateur non connecté'], Response::HTTP_UNAUTHORIZED);
+        }
+
+        // Vérification de l'instance pour éviter les erreurs
+        if (!method_exists($utilisateur, 'getId') || !method_exists($utilisateur, 'getEmail')) {
+            return new JsonResponse(['error' => 'Utilisateur non valide'], Response::HTTP_INTERNAL_SERVER_ERROR);
+        }
+
+        return new JsonResponse([
+            'id' => $utilisateur->getId(),
+            'email' => $utilisateur->getEmail(),
+            'roles' => $utilisateur->getRoles(),
+            'prenom' => method_exists($utilisateur, 'getPrenom') ? $utilisateur->getPrenom() : null,
+            'nom' => method_exists($utilisateur, 'getNom') ? $utilisateur->getNom() : null
+        ]);
+    }
 }
